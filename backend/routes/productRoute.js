@@ -2,7 +2,7 @@ const express = require("express")
 const router = express.Router();
 const { 
     listAll,
-    show,
+   
     addProduct,
     updateProduct,
     updateAllProducts,
@@ -14,7 +14,7 @@ const {
 
 
 router.get("/list", listAll)
-router.get("/show", show)
+
 router.get("/findByBarcode" , findByBarcode )
 router.post("/addProduct", addProduct)
 

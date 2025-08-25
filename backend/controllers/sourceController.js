@@ -1,45 +1,4 @@
-// // controllers/sourceController.js
 
-// // GET /list
-// exports.listAll = async (req, res) => {
-//     res.json({
-//         sources: ["Farm A", "Farm B", "Market C"]
-//     });
-// };
-
-// // GET /show
-// exports.showSource = async (req, res) => {
-//     res.json({
-//         message: "Showing one source",
-//         source: { id: 1, name: "Farm A", location: "North Valley" }
-//     });
-// };
-
-// // POST /addSource
-// exports.addSource = async (req, res) => {
-//     const { name, location } = req.body;
-//     res.json({
-//         message: "Source added successfully",
-//         source: { name, location }
-//     });
-// };
-
-// // PUT /updateSource
-// exports.updateSource = async (req, res) => {
-//     const { id, newName, newLocation } = req.body;
-//     res.json({
-//         message: `Source ${id} updated successfully`,
-//         updated: { newName, newLocation }
-//     });
-// };
-
-// // DELETE /deleteSource
-// exports.deleteSource = async (req, res) => {
-//     const { id } = req.body;
-//     res.json({
-//         message: `Source ${id} deleted successfully`
-//     });
-// };
 // controllers/sourceController.js
 const pool = require("../config/db");
 
@@ -55,20 +14,7 @@ exports.listAll = async (req, res) => {
 };
 
 // GET /show - fetch a single source by ID
-exports.showSource = async (req, res) => {
-    try {
-        const { source_id } = req.query; // e.g., /show?source_id=1
-        const [rows] = await pool.query(
-            "SELECT * FROM source WHERE source_id = ?",
-            [source_id]
-        );
-        if (rows.length === 0) return res.status(404).json({ message: "Source not found" });
-        res.json({ source: rows[0] });
-    } catch (err) {
-        console.error(err);
-        res.status(500).json({ error: "Database error" });
-    }
-};
+
 
 // POST /addSource - add a new source
 exports.addSource = async (req, res) => {
