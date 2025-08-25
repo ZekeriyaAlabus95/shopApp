@@ -1,0 +1,156 @@
+/* === Root container === */
+#root {
+  width: 100%;          /* take full screen width */
+  max-width: none;      /* remove 1280px limit */
+  margin: 0;
+  padding: 0;
+  text-align: left;     /* dashboards usually left-align */
+}
+
+/* === Original Vite Logo styles kept (optional if you still use logos) === */
+.logo {
+  height: 6em;
+  padding: 1.5em;
+  will-change: filter;
+  transition: filter 300ms;
+}
+.logo:hover {
+  filter: drop-shadow(0 0 2em #646cffaa);
+}
+.logo.react:hover {
+  filter: drop-shadow(0 0 2em #61dafbaa);
+}
+
+@keyframes logo-spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  a:nth-of-type(2) .logo {
+    animation: logo-spin infinite 20s linear;
+  }
+}
+
+.card {
+  padding: 2em;
+}
+
+.read-the-docs {
+  color: #888;
+}
+
+/* === Dashboard styles === */
+.app {
+  font-family: sans-serif;
+  background: #0f172a;
+  color: #e5e7eb;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Top bar with navigation */
+.topbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1rem 2rem;
+  border-bottom: 1px solid #334155;
+  position: sticky; /* keeps header visible on scroll */
+  top: 0;
+  background: #0f172a;
+  z-index: 10;
+}
+
+.brand {
+  font-size: 1.5rem;
+  color: #60a5fa;
+}
+
+.tabs {
+  display: flex;
+  gap: 0.75rem;
+}
+
+.tab {
+  background: transparent;
+  color: #e5e7eb;
+  border: 1px solid #334155;
+  padding: 0.5rem 1.2rem;
+  border-radius: 999px;
+  cursor: pointer;
+  font-size: 0.95rem;
+}
+
+.tab.active {
+  background: rgba(96, 165, 250, 0.2);
+  border-color: #60a5fa;
+}
+
+/* Main content */
+.content {
+  flex: 1;
+  padding: 2rem;
+}
+
+.panel {
+  margin-top: 1rem;
+  background: #1e293b; /* darker panel background */
+  padding: 1.5rem;
+  border-radius: 0.75rem;
+  box-shadow: 0 4px 8px rgba(0,0,0,0.3);
+}
+
+/* Action button */
+.btn {
+  background: #60a5fa;
+  color: white;
+  border: none;
+  padding: 0.6rem 1.2rem;
+  border-radius: 0.5rem;
+  cursor: pointer;
+  font-size: 1rem;
+}
+
+.btn:hover {
+  background: #3b82f6;
+}
+.product-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 1rem;
+  background: #1e293b;
+}
+
+.product-table th,
+.product-table td {
+  padding: 0.75rem 1rem;
+  border: 1px solid #334155;
+  text-align: left;
+}
+
+.product-table th {
+  background: #334155;
+  color: #60a5fa;
+}
+
+.product-table td.actions button {
+  margin-right: 0.5rem;
+  padding: 0.3rem 0.6rem;
+  font-size: 0.85rem;
+  border-radius: 0.25rem;
+}
+
+.product-table td.actions input[type="checkbox"] {
+  margin-left: 0.5rem;
+  transform: scale(1.2);
+}
+
+.product-table tr:hover {
+  background: #0f172a;
+}
