@@ -1,6 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
 import axios from "axios";
-import BarcodeScannerComponent from "react-qr-barcode-scanner";
 import "./App.css";
 import Sell from "./sell";
 import AddProduct from "./addProduct";
@@ -9,14 +8,7 @@ function Product() {
   const [products, setProducts] = useState([]);
   const [sourceList, setSourceList] = useState([]);
   const [editingProduct, setEditingProduct] = useState(null);
-  const [editForm, setEditForm] = useState({ name: "", price: "", category: "" });
-  const [selectedProducts, setSelectedProducts] = useState([]);
-
-  // Sub-tabs: "sell", "add", "list"
-  const [activeTab, setActiveTab] = useState("list");
-
-  // Add product state
-  const [newProduct, setNewProduct] = useState({
+  const [editForm, setEditForm] = useState({
     barcode: "",
     name: "",
     price: "",
@@ -24,9 +16,8 @@ function Product() {
     quantity: "",
     source_id: "",
   });
-  const [scanBarcode, setScanBarcode] = useState(false);
-
-  // Filters
+  const [selectedProducts, setSelectedProducts] = useState([]);
+  const [activeTab, setActiveTab] = useState("list");
   const [search, setSearch] = useState("");
   const [sourceFilter, setSourceFilter] = useState("all");
   const [categoryFilter, setCategoryFilter] = useState("all");
@@ -57,34 +48,6 @@ function Product() {
   };
 
   // ------------------- CRUD & Handlers -------------------
-
-  const handleAddProduct = async () => {
-    const { barcode, name, price, category, quantity, source_id } = newProduct;
-    if (!barcode || !name || !price || !source_id) {
-      alert("Barcode, Name, Price, and Source are required");
-      return;
-    }
-
-    try {
-      await axios.post("http://localhost:8080/api/products/addProduct", {
-        barcode,
-        product_name: name,
-        price,
-        category,
-        quantity,
-        source_id,
-      });
-      await fetchProducts();
-      setNewProduct({ barcode: "", name: "", price: "", category: "", quantity: "", source_id: "" });
-      setScanBarcode(false);
-      alert("Product added");
-      setActiveTab("list"); // switch to list after adding
-    } catch (err) {
-      if (err.response?.data?.error) alert(err.response.data.error);
-      else alert("Error adding product");
-    }
-  };
-
   const handleDeleteProducts = async () => {
     if (selectedProducts.length === 0) {
       alert("Select at least one product");
@@ -106,23 +69,26 @@ function Product() {
   const handleEditProduct = (product) => {
     setEditingProduct(product.product_id);
     setEditForm({
+      barcode: product.barcode,
       name: product.product_name,
       price: product.price,
       category: product.category || "",
+      quantity: product.quantity,
+      source_id: product.source_id,
     });
   };
 
   const handleSaveProduct = async (id) => {
-    const product = products.find((p) => p.product_id === id);
     try {
       await axios.put("http://localhost:8080/api/products/update", {
         product_id: id,
-        product_name: editForm.name || product.product_name,
-        price: editForm.price || product.price,
-        barcode: product.barcode,
-        date_accepted: product.date_accepted,
-        quantity: product.quantity,
-        source_id: product.source_id,
+        barcode: editForm.barcode,
+        product_name: editForm.name,
+        price: editForm.price,
+        category: editForm.category,
+        quantity: editForm.quantity,
+        source_id: editForm.source_id,
+        // DO NOT send date_accepted, backend keeps it
       });
       await fetchProducts();
       setEditingProduct(null);
@@ -141,8 +107,12 @@ function Product() {
 
   const visibleProducts = useMemo(() => {
     let rows = [...products];
-    if (sourceFilter !== "all") rows = rows.filter((p) => Number(p.source_id) === Number(sourceFilter));
-    if (categoryFilter !== "all") rows = rows.filter((p) => (p.category || "").toLowerCase() === categoryFilter.toLowerCase());
+    if (sourceFilter !== "all")
+      rows = rows.filter((p) => Number(p.source_id) === Number(sourceFilter));
+    if (categoryFilter !== "all")
+      rows = rows.filter(
+        (p) => (p.category || "").toLowerCase() === categoryFilter.toLowerCase()
+      );
     if (search.trim()) {
       const q = search.toLowerCase();
       rows = rows.filter(
@@ -160,10 +130,14 @@ function Product() {
         rows.sort((a, b) => Number(b.price) - Number(a.price));
         break;
       case "name-asc":
-        rows.sort((a, b) => (a.product_name || "").localeCompare(b.product_name || ""));
+        rows.sort((a, b) =>
+          (a.product_name || "").localeCompare(b.product_name || "")
+        );
         break;
       case "name-desc":
-        rows.sort((a, b) => (b.product_name || "").localeCompare(a.product_name || ""));
+        rows.sort((a, b) =>
+          (b.product_name || "").localeCompare(a.product_name || "")
+        );
         break;
       default:
         break;
@@ -175,12 +149,9 @@ function Product() {
   const renderTabContent = () => {
     switch (activeTab) {
       case "sell":
-        return(
-         <Sell onSaleComplete={fetchProducts}/>
-        )
-     
-         case "add":
-      return <AddProduct  onProductAdded={fetchProducts}/>;
+        return <Sell onSaleComplete={fetchProducts} />;
+      case "add":
+        return <AddProduct onProductAdded={fetchProducts} />;
       case "list":
         return (
           <div className="table-wrap">
@@ -190,19 +161,26 @@ function Product() {
                   <th>
                     <input
                       type="checkbox"
-                      checked={products.length > 0 && selectedProducts.length === products.length}
+                      checked={
+                        products.length > 0 &&
+                        selectedProducts.length === products.length
+                      }
                       onChange={() => {
-                        if (selectedProducts.length === products.length) setSelectedProducts([]);
-                        else setSelectedProducts(products.map((p) => p.product_id));
+                        if (selectedProducts.length === products.length)
+                          setSelectedProducts([]);
+                        else
+                          setSelectedProducts(
+                            products.map((p) => p.product_id)
+                          );
                       }}
                     />
                   </th>
                   <th>Actions</th>
+                  <th>Barcode</th>
                   <th>Name</th>
                   <th>Price</th>
                   <th>Category</th>
                   <th>Quantity</th>
-                  <th>Barcode</th>
                   <th>Date</th>
                   <th>Source</th>
                 </tr>
@@ -226,37 +204,101 @@ function Product() {
                     <td>
                       {editingProduct === p.product_id ? (
                         <>
-                          <button className="btn xs" onClick={() => handleSaveProduct(p.product_id)}>
+                          <button
+                            className="btn xs"
+                            onClick={() => handleSaveProduct(p.product_id)}
+                          >
                             Save
                           </button>
-                          <button className="btn xs danger" onClick={() => setEditingProduct(null)}>
+                          <button
+                            className="btn xs danger"
+                            onClick={() => setEditingProduct(null)}
+                          >
                             Cancel
                           </button>
                         </>
                       ) : (
-                        <button className="btn xs" onClick={() => handleEditProduct(p)}>
+                        <button
+                          className="btn xs"
+                          onClick={() => handleEditProduct(p)}
+                        >
                           Edit
                         </button>
                       )}
                     </td>
+
+                    <td>
+                      {editingProduct === p.product_id ? (
+                        <input
+                          className="input"
+                          value={editForm.barcode}
+                          onChange={(e) =>
+                            setEditForm({ ...editForm, barcode: e.target.value })
+                          }
+                        />
+                      ) : (
+                        p.barcode
+                      )}
+                    </td>
+
                     <td>
                       {editingProduct === p.product_id ? (
                         <input
                           className="input"
                           value={editForm.name}
-                          onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
+                          onChange={(e) =>
+                            setEditForm({ ...editForm, name: e.target.value })
+                          }
                         />
                       ) : (
                         p.product_name
                       )}
                     </td>
-                    <td>{editingProduct === p.product_id ? editForm.price : `$${p.price}`}</td>
+
                     <td>
-                      {editingProduct === p.product_id ? editForm.category : p.category || "-"}
+                      {editingProduct === p.product_id ? (
+                        <input
+                          className="input"
+                          value={editForm.price}
+                          onChange={(e) =>
+                            setEditForm({ ...editForm, price: e.target.value })
+                          }
+                        />
+                      ) : (
+                        `$${p.price}`
+                      )}
                     </td>
-                    <td>{p.quantity}</td>
-                    <td>{p.barcode}</td>
-                    <td>{p.date_accepted ? new Date(p.date_accepted).toLocaleDateString() : "-"}</td>
+
+                    <td>
+                      {editingProduct === p.product_id ? (
+                        <input
+                          className="input"
+                          value={editForm.category}
+                          onChange={(e) =>
+                            setEditForm({ ...editForm, category: e.target.value })
+                          }
+                        />
+                      ) : (
+                        p.category || "-"
+                      )}
+                    </td>
+
+                    <td>
+                      {editingProduct === p.product_id ? (
+                        <input
+                          className="input"
+                          value={editForm.quantity}
+                          onChange={(e) =>
+                            setEditForm({ ...editForm, quantity: e.target.value })
+                          }
+                        />
+                      ) : (
+                        p.quantity
+                      )}
+                    </td>
+
+                    <td>{p.date_accepted ? p.date_accepted.split("T")[0] : "-"}</td>
+
                     <td>{p.name || "-"}</td>
                   </tr>
                 ))}

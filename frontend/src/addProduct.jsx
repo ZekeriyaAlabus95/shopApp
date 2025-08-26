@@ -146,7 +146,7 @@ function AddProduct({ onProductAdded }) {
           onChange={(e) => setNewProduct({ ...newProduct, category: e.target.value })}
         />
 
-        <label>Quantity</label>
+        <label>The New Quantity</label>
         <input
           className="input"
           type="number"
