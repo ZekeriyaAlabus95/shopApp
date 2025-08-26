@@ -9,7 +9,9 @@ const {
     updateByCayegory,
     updateBySource,
     deleteProduct ,
-    findByBarcode
+    findByBarcode ,
+    sellProduct
+    
 } = require("../controllers/productController");
 
 
@@ -22,7 +24,7 @@ router.put("/update", updateProduct)
 router.put("/updateAllProducts", updateAllProducts)
 router.put("/updateByCategory", updateByCayegory)
 router.put("/updateBySource", updateBySource)
-
+router.post("/sell" , sellProduct)
 router.delete("/deleteProduct", deleteProduct)
 
 module.exports = router

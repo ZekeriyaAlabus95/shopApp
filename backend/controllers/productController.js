@@ -130,22 +130,77 @@ exports.deleteProduct = async (req, res) => {
     }
 };
 exports.findByBarcode = async (req, res) => {
-    try {
-        const { barcode } = req.params;
+  try {
+    const { barcode } = req.query;
 
-        const [rows] = await pool.query(
-            "SELECT p.*, s.name as source_name FROM product p JOIN source s ON p.source_id = s.source_id WHERE barcode = ?",
-            [barcode]
+    const [rows] = await pool.query(
+      "SELECT p.*, s.name as source_name FROM product p JOIN source s ON p.source_id = s.source_id WHERE barcode = ?",
+      [barcode]
+    );
+
+    if (rows.length === 0) {
+      return res.status(404).json({ error: "❌ Product not found" });
+    }
+
+    // Wrap product in an object
+    res.json({ product: rows[0] });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "❌ Database error" });
+  }
+};
+
+// POST /sell - sell products
+exports.sellProduct = async (req, res) => {
+  try {
+    const { items } = req.body; 
+    // items = [{ product_id: 1, quantity: 2 }, { product_id: 5, quantity: 1 }, ...]
+
+    if (!items || items.length === 0) {
+      return res.status(400).json({ error: "No products provided for selling" });
+    }
+
+    // Start a transaction to ensure consistency
+    const conn = await pool.getConnection();
+    try {
+      await conn.beginTransaction();
+
+      for (const item of items) {
+        const [rows] = await conn.query(
+          "SELECT quantity FROM product WHERE product_id = ?",
+          [item.product_id]
         );
 
         if (rows.length === 0) {
-            return res.status(404).json({ error: "❌ Product not found" });
+          throw new Error(`Product ID ${item.product_id} not found`);
         }
 
-        res.json(rows[0]);
+        const currentQty = Number(rows[0].quantity);
+        if (currentQty < item.quantity) {
+          throw new Error(
+            `Not enough quantity for product ID ${item.product_id}. Available: ${currentQty}`
+          );
+        }
+
+        await conn.query(
+          "UPDATE product SET quantity = quantity - ? WHERE product_id = ?",
+          [item.quantity, item.product_id]
+        );
+      }
+
+      await conn.commit();
+      res.json({ message: "✅ Products sold successfully" });
     } catch (err) {
-        console.error(err);
-        res.status(500).json({ error: "❌ Database error" });
+      await conn.rollback();
+      console.error(err);
+      res.status(400).json({ error: err.message });
+    } finally {
+      conn.release();
     }
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "❌ Database error" });
+  }
 };
+
 

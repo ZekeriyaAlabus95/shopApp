@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo } from "react";
 import axios from "axios";
 import BarcodeScannerComponent from "react-qr-barcode-scanner";
 import "./App.css";
-
+import Sell from "./sell";
 function Product() {
   const [products, setProducts] = useState([]);
   const [sourceList, setSourceList] = useState([]);
@@ -10,8 +10,10 @@ function Product() {
   const [editForm, setEditForm] = useState({ name: "", price: "", category: "" });
   const [selectedProducts, setSelectedProducts] = useState([]);
 
-  // Add product modal
-  const [showAddProductModal, setShowAddProductModal] = useState(false);
+  // Sub-tabs: "sell", "add", "list"
+  const [activeTab, setActiveTab] = useState("list");
+
+  // Add product state
   const [newProduct, setNewProduct] = useState({
     barcode: "",
     name: "",
@@ -28,7 +30,6 @@ function Product() {
   const [categoryFilter, setCategoryFilter] = useState("all");
   const [sortBy, setSortBy] = useState("none");
 
-  // Load products & sources
   useEffect(() => {
     fetchProducts();
     fetchSources();
@@ -53,19 +54,35 @@ function Product() {
     }
   };
 
-  // Select functions
-  const toggleSelectProduct = (id) => {
-    setSelectedProducts((prev) =>
-      prev.includes(id) ? prev.filter((sid) => sid !== id) : [...prev, id]
-    );
+  // ------------------- CRUD & Handlers -------------------
+
+  const handleAddProduct = async () => {
+    const { barcode, name, price, category, quantity, source_id } = newProduct;
+    if (!barcode || !name || !price || !source_id) {
+      alert("Barcode, Name, Price, and Source are required");
+      return;
+    }
+
+    try {
+      await axios.post("http://localhost:8080/api/products/addProduct", {
+        barcode,
+        product_name: name,
+        price,
+        category,
+        quantity,
+        source_id,
+      });
+      await fetchProducts();
+      setNewProduct({ barcode: "", name: "", price: "", category: "", quantity: "", source_id: "" });
+      setScanBarcode(false);
+      alert("Product added");
+      setActiveTab("list"); // switch to list after adding
+    } catch (err) {
+      if (err.response?.data?.error) alert(err.response.data.error);
+      else alert("Error adding product");
+    }
   };
 
-  const toggleSelectAllProducts = () => {
-    if (selectedProducts.length === products.length) setSelectedProducts([]);
-    else setSelectedProducts(products.map((p) => p.product_id));
-  };
-
-  // CRUD Handlers with live refresh
   const handleDeleteProducts = async () => {
     if (selectedProducts.length === 0) {
       alert("Select at least one product");
@@ -77,7 +94,7 @@ function Product() {
       await axios.delete("http://localhost:8080/api/products/deleteProduct", {
         data: { product_ids: selectedProducts },
       });
-      await fetchProducts(); // 🔄 live refresh
+      await fetchProducts();
       alert("Products deleted");
     } catch {
       alert("Error deleting products");
@@ -105,7 +122,7 @@ function Product() {
         quantity: product.quantity,
         source_id: product.source_id,
       });
-      await fetchProducts(); // 🔄 live refresh
+      await fetchProducts();
       setEditingProduct(null);
       alert("Product updated");
     } catch {
@@ -113,66 +130,17 @@ function Product() {
     }
   };
 
-  const handleAddProduct = async () => {
-  const { barcode, name, price, category, quantity, source_id } = newProduct;
-
-  if (!barcode || !name || !price || !source_id) {
-    alert("Barcode, Name, Price, and Source are required");
-    return;
-  }
-
-  try {
-    await axios.post("http://localhost:8080/api/products/addProduct", {
-      barcode,
-      product_name: name,
-      price,
-      category,
-      quantity,
-      source_id,
-    });
-
-    await fetchProducts(); // 🔄 live refresh
-    setNewProduct({
-      barcode: "",
-      name: "",
-      price: "",
-      category: "",
-      quantity: "",
-      source_id: "",
-    });
-    setShowAddProductModal(false);
-    setScanBarcode(false);
-    alert("Product added");
-  } catch (err) {
-    // Show backend error message
-    if (err.response?.data?.error) {
-      alert(err.response.data.error);
-    } else {
-      alert("Error adding product");
-    }
-  }
-};
-
-
-  // Filters & sorting
+  // ------------------- Filters & Sorting -------------------
   const categories = useMemo(() => {
     const set = new Set();
-    products.forEach((p) => {
-      if (p.category) set.add(p.category);
-    });
+    products.forEach((p) => p.category && set.add(p.category));
     return Array.from(set).sort();
   }, [products]);
 
   const visibleProducts = useMemo(() => {
     let rows = [...products];
-    if (sourceFilter !== "all") {
-      rows = rows.filter((p) => Number(p.source_id) === Number(sourceFilter));
-    }
-    if (categoryFilter !== "all") {
-      rows = rows.filter(
-        (p) => (p.category || "").toLowerCase() === categoryFilter.toLowerCase()
-      );
-    }
+    if (sourceFilter !== "all") rows = rows.filter((p) => Number(p.source_id) === Number(sourceFilter));
+    if (categoryFilter !== "all") rows = rows.filter((p) => (p.category || "").toLowerCase() === categoryFilter.toLowerCase());
     if (search.trim()) {
       const q = search.toLowerCase();
       rows = rows.filter(
@@ -201,69 +169,16 @@ function Product() {
     return rows;
   }, [products, sourceFilter, categoryFilter, search, sortBy]);
 
-  return (
-    <section className="panel">
-      <div className="panel-header">
-        <h2>Products</h2>
-        <div className="actions-row">
-          <button className="btn danger" onClick={handleDeleteProducts}>
-            Delete Selected
-          </button>
-          <button className="btn" onClick={() => setShowAddProductModal(true)}>
-            Add Product
-          </button>
-        </div>
-      </div>
-
-      {/* Filters */}
-      <div className="filters">
-        <input
-          className="input"
-          placeholder="Search..."
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-        />
-        <select
-          className="input"
-          value={sourceFilter}
-          onChange={(e) => setSourceFilter(e.target.value)}
-        >
-          <option value="all">All Sources</option>
-          {sourceList.map((s) => (
-            <option key={s.source_id} value={s.source_id}>
-              {s.name}
-            </option>
-          ))}
-        </select>
-        <select
-          className="input"
-          value={categoryFilter}
-          onChange={(e) => setCategoryFilter(e.target.value)}
-        >
-          <option value="all">All Categories</option>
-          {categories.map((c) => (
-            <option key={c} value={c}>
-              {c}
-            </option>
-          ))}
-        </select>
-        <button
-          className="btn ghost"
-          onClick={() => {
-            setSearch("");
-            setSourceFilter("all");
-            setCategoryFilter("all");
-            setSortBy("none");
-          }}
-        >
-          Clear
-        </button>
-      </div>
-
-      {/* Add Product Modal */}
-      {showAddProductModal && (
-        <div className="modal">
-          <div className="modal-content">
+  // ------------------- Sub-tab content -------------------
+  const renderTabContent = () => {
+    switch (activeTab) {
+      case "sell":
+        return(
+         <Sell/>
+        )
+      case "add":
+        return (
+          <div className="add-product-form">
             <h3>Add Product</h3>
             <button className="btn" onClick={() => setScanBarcode(!scanBarcode)}>
               {scanBarcode ? "Stop Scanner" : "Scan Barcode"}
@@ -309,7 +224,6 @@ function Product() {
               value={newProduct.quantity}
               onChange={(e) => setNewProduct({ ...newProduct, quantity: e.target.value })}
             />
-
             <select
               className="input"
               value={newProduct.source_id}
@@ -322,122 +236,117 @@ function Product() {
                 </option>
               ))}
             </select>
-
-            <div className="modal-actions">
-              <button className="btn" onClick={handleAddProduct}>
-                Save
-              </button>
-              <button
-                className="btn danger"
-                onClick={() => {
-                  setShowAddProductModal(false);
-                  setScanBarcode(false);
-                }}
-              >
-                Cancel
-              </button>
-            </div>
+            <button className="btn" onClick={handleAddProduct}>
+              Save
+            </button>
           </div>
-        </div>
-      )}
+        );
+      case "list":
+        return (
+          <div className="table-wrap">
+            <table className="product-table">
+              <thead>
+                <tr>
+                  <th>
+                    <input
+                      type="checkbox"
+                      checked={products.length > 0 && selectedProducts.length === products.length}
+                      onChange={() => {
+                        if (selectedProducts.length === products.length) setSelectedProducts([]);
+                        else setSelectedProducts(products.map((p) => p.product_id));
+                      }}
+                    />
+                  </th>
+                  <th>Actions</th>
+                  <th>Name</th>
+                  <th>Price</th>
+                  <th>Category</th>
+                  <th>Quantity</th>
+                  <th>Barcode</th>
+                  <th>Date</th>
+                  <th>Source</th>
+                </tr>
+              </thead>
+              <tbody>
+                {visibleProducts.map((p) => (
+                  <tr key={p.product_id}>
+                    <td>
+                      <input
+                        type="checkbox"
+                        checked={selectedProducts.includes(p.product_id)}
+                        onChange={() =>
+                          setSelectedProducts((prev) =>
+                            prev.includes(p.product_id)
+                              ? prev.filter((id) => id !== p.product_id)
+                              : [...prev, p.product_id]
+                          )
+                        }
+                      />
+                    </td>
+                    <td>
+                      {editingProduct === p.product_id ? (
+                        <>
+                          <button className="btn xs" onClick={() => handleSaveProduct(p.product_id)}>
+                            Save
+                          </button>
+                          <button className="btn xs danger" onClick={() => setEditingProduct(null)}>
+                            Cancel
+                          </button>
+                        </>
+                      ) : (
+                        <button className="btn xs" onClick={() => handleEditProduct(p)}>
+                          Edit
+                        </button>
+                      )}
+                    </td>
+                    <td>
+                      {editingProduct === p.product_id ? (
+                        <input
+                          className="input"
+                          value={editForm.name}
+                          onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
+                        />
+                      ) : (
+                        p.product_name
+                      )}
+                    </td>
+                    <td>{editingProduct === p.product_id ? editForm.price : `$${p.price}`}</td>
+                    <td>
+                      {editingProduct === p.product_id ? editForm.category : p.category || "-"}
+                    </td>
+                    <td>{p.quantity}</td>
+                    <td>{p.barcode}</td>
+                    <td>{p.date_accepted ? new Date(p.date_accepted).toLocaleDateString() : "-"}</td>
+                    <td>{p.name || "-"}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        );
+      default:
+        return null;
+    }
+  };
 
-      {/* Products Table */}
-      <div className="table-wrap">
-        <table className="product-table">
-          <thead>
-            <tr>
-              <th>
-                <input
-                  type="checkbox"
-                  checked={products.length > 0 && selectedProducts.length === products.length}
-                  onChange={toggleSelectAllProducts}
-                />
-              </th>
-              <th>Actions</th>
-              <th>Name</th>
-              <th>Price</th>
-              <th>Category</th>
-              <th>Quantity</th>
-              <th>Barcode</th>
-              <th>Date</th>
-              <th>Source</th>
-            </tr>
-          </thead>
-          <tbody>
-            {visibleProducts.map((p) => (
-              <tr key={p.product_id}>
-                <td>
-                  <input
-                    type="checkbox"
-                    checked={selectedProducts.includes(p.product_id)}
-                    onChange={() => toggleSelectProduct(p.product_id)}
-                  />
-                </td>
-                <td>
-                  {editingProduct === p.product_id ? (
-                    <>
-                      <button className="btn xs" onClick={() => handleSaveProduct(p.product_id)}>
-                        Save
-                      </button>
-                      <button className="btn xs danger" onClick={() => setEditingProduct(null)}>
-                        Cancel
-                      </button>
-                    </>
-                  ) : (
-                    <button className="btn xs" onClick={() => handleEditProduct(p)}>
-                      Edit
-                    </button>
-                  )}
-                </td>
-                <td>
-                  {editingProduct === p.product_id ? (
-                    <input
-                      className="input"
-                      value={editForm.name}
-                      onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
-                    />
-                  ) : (
-                    p.product_name
-                  )}
-                </td>
-                <td>
-                  {editingProduct === p.product_id ? (
-                    <input
-                      className="input"
-                      value={editForm.price}
-                      onChange={(e) => setEditForm({ ...editForm, price: e.target.value })}
-                    />
-                  ) : (
-                    `$${p.price}`
-                  )}
-                </td>
-                <td>
-                  {editingProduct === p.product_id ? (
-                    <input
-                      className="input"
-                      value={editForm.category}
-                      onChange={(e) => setEditForm({ ...editForm, category: e.target.value })}
-                    />
-                  ) : (
-                    p.category || "-"
-                  )}
-                </td>
-                <td>{p.quantity}</td>
-                <td>{p.barcode}</td>
-                <td>{p.date_accepted ? new Date(p.date_accepted).toLocaleDateString() : "-"}</td>
-                <td>{p.name || "-"}</td>
-              </tr>
-            ))}
-            {visibleProducts.length === 0 && (
-              <tr>
-                <td colSpan={9} style={{ textAlign: "center", opacity: 0.7 }}>
-                  No products found
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
+  return (
+    <section className="panel">
+      <div className="panel-header">
+        <h2>Products Dashboard</h2>
+        <div className="tabs">
+          {["sell", "add", "list"].map((tab) => (
+            <button
+              key={tab}
+              className={activeTab === tab ? "tab active" : "tab"}
+              onClick={() => setActiveTab(tab)}
+            >
+              {tab.charAt(0).toUpperCase() + tab.slice(1)}
+            </button>
+          ))}
+        </div>
       </div>
+
+      {renderTabContent()}
     </section>
   );
 }
