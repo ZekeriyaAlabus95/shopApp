@@ -3,6 +3,8 @@ import axios from "axios";
 import BarcodeScannerComponent from "react-qr-barcode-scanner";
 import "./App.css";
 import Sell from "./sell";
+import AddProduct from "./addProduct";
+
 function Product() {
   const [products, setProducts] = useState([]);
   const [sourceList, setSourceList] = useState([]);
@@ -174,73 +176,11 @@ function Product() {
     switch (activeTab) {
       case "sell":
         return(
-         <Sell/>
+         <Sell onSaleComplete={fetchProducts}/>
         )
-      case "add":
-        return (
-          <div className="add-product-form">
-            <h3>Add Product</h3>
-            <button className="btn" onClick={() => setScanBarcode(!scanBarcode)}>
-              {scanBarcode ? "Stop Scanner" : "Scan Barcode"}
-            </button>
-
-            {scanBarcode && (
-              <BarcodeScannerComponent
-                width={300}
-                height={200}
-                onUpdate={(err, result) => {
-                  if (result) setNewProduct((np) => ({ ...np, barcode: result.text }));
-                }}
-              />
-            )}
-
-            <input
-              className="input"
-              placeholder="Barcode"
-              value={newProduct.barcode}
-              onChange={(e) => setNewProduct({ ...newProduct, barcode: e.target.value })}
-            />
-            <input
-              className="input"
-              placeholder="Name"
-              value={newProduct.name}
-              onChange={(e) => setNewProduct({ ...newProduct, name: e.target.value })}
-            />
-            <input
-              className="input"
-              placeholder="Price"
-              value={newProduct.price}
-              onChange={(e) => setNewProduct({ ...newProduct, price: e.target.value })}
-            />
-            <input
-              className="input"
-              placeholder="Category"
-              value={newProduct.category}
-              onChange={(e) => setNewProduct({ ...newProduct, category: e.target.value })}
-            />
-            <input
-              className="input"
-              placeholder="Quantity"
-              value={newProduct.quantity}
-              onChange={(e) => setNewProduct({ ...newProduct, quantity: e.target.value })}
-            />
-            <select
-              className="input"
-              value={newProduct.source_id}
-              onChange={(e) => setNewProduct({ ...newProduct, source_id: e.target.value })}
-            >
-              <option value="">Select Source</option>
-              {sourceList.map((s) => (
-                <option key={s.source_id} value={s.source_id}>
-                  {s.name}
-                </option>
-              ))}
-            </select>
-            <button className="btn" onClick={handleAddProduct}>
-              Save
-            </button>
-          </div>
-        );
+     
+         case "add":
+      return <AddProduct  onProductAdded={fetchProducts}/>;
       case "list":
         return (
           <div className="table-wrap">

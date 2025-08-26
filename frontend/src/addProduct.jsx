@@ -1,15 +1,16 @@
 import { useState, useEffect } from "react";
 import axios from "axios";
 import BarcodeScannerComponent from "react-qr-barcode-scanner";
+import "./App.css";
 
-function AddProduct() {
+function AddProduct({ onProductAdded }) {
   const [sourceList, setSourceList] = useState([]);
   const [newProduct, setNewProduct] = useState({
     barcode: "",
     name: "",
     price: "",
     category: "",
-    quantity: "",
+    quantity: 1,
     source_id: "",
   });
   const [scanBarcode, setScanBarcode] = useState(false);
@@ -27,6 +28,30 @@ function AddProduct() {
     }
   };
 
+  // Auto-fill product info if barcode exists
+  const fetchProductByBarcode = async (barcode) => {
+    if (!barcode) return;
+    try {
+      const res = await axios.get(`http://localhost:8080/api/products/findByBarcode`, {
+        params: { barcode },
+      });
+
+      if (res.data.product) {
+        const product = res.data.product;
+        setNewProduct((prev) => ({
+          ...prev,
+          name: product.product_name,
+          price: product.price,
+          category: product.category,
+          source_id: product.source_id,
+          // keep quantity as user input
+        }));
+      }
+    } catch (err) {
+      console.log("Product not found, can add as new");
+    }
+  };
+
   const handleAddProduct = async () => {
     const { barcode, name, price, category, quantity, source_id } = newProduct;
     if (!barcode || !name || !price || !source_id) {
@@ -35,7 +60,7 @@ function AddProduct() {
     }
 
     try {
-      await axios.post("http://localhost:8080/api/products/addProduct", {
+      await axios.post("http://localhost:8080/api/products/addOrIncrease", {
         barcode,
         product_name: name,
         price,
@@ -43,77 +68,120 @@ function AddProduct() {
         quantity,
         source_id,
       });
-      alert("Product added");
-      window.close(); // Close this tab after saving
+
+      alert("Product added or quantity increased successfully");
+
+      // Reset form
+      setNewProduct({
+        barcode: "",
+        name: "",
+        price: "",
+        category: "",
+        quantity: 1,
+        source_id: "",
+      });
+      setScanBarcode(false);
+
+      if (onProductAdded) onProductAdded();
     } catch (err) {
-      if (err.response?.data?.error) {
-        alert(err.response.data.error);
-      } else {
-        alert("Error adding product");
-      }
+      if (err.response?.data?.error) alert(err.response.data.error);
+      else alert("Error adding product");
     }
   };
 
   return (
-    <div style={{ padding: "20px" }}>
-      <h2>Add Product</h2>
-      <button onClick={() => setScanBarcode(!scanBarcode)}>
-        {scanBarcode ? "Stop Scanner" : "Scan Barcode"}
-      </button>
+    <section className="panel">
+      <div className="panel-header">
+        <h2>Add Product</h2>
+        <button className="btn" onClick={() => setScanBarcode(!scanBarcode)}>
+          {scanBarcode ? "Stop Scanner" : "Scan Barcode"}
+        </button>
+      </div>
 
       {scanBarcode && (
-        <BarcodeScannerComponent
-          width={300}
-          height={200}
-          onUpdate={(err, result) => {
-            if (result) setNewProduct((np) => ({ ...np, barcode: result.text }));
-          }}
-        />
+        <div className="scanner-wrap">
+          <BarcodeScannerComponent
+            width={300}
+            height={200}
+            onUpdate={(err, result) => {
+              if (result) {
+                setNewProduct((prev) => ({ ...prev, barcode: result.text }));
+                fetchProductByBarcode(result.text);
+              }
+            }}
+          />
+        </div>
       )}
 
-      <input
-        placeholder="Barcode"
-        value={newProduct.barcode}
-        onChange={(e) => setNewProduct({ ...newProduct, barcode: e.target.value })}
-      />
-      <input
-        placeholder="Name"
-        value={newProduct.name}
-        onChange={(e) => setNewProduct({ ...newProduct, name: e.target.value })}
-      />
-      <input
-        placeholder="Price"
-        value={newProduct.price}
-        onChange={(e) => setNewProduct({ ...newProduct, price: e.target.value })}
-      />
-      <input
-        placeholder="Category"
-        value={newProduct.category}
-        onChange={(e) => setNewProduct({ ...newProduct, category: e.target.value })}
-      />
-      <input
-        placeholder="Quantity"
-        value={newProduct.quantity}
-        onChange={(e) => setNewProduct({ ...newProduct, quantity: e.target.value })}
-      />
+      <div className="form">
+        <label>Barcode</label>
+        <input
+          className="input"
+          value={newProduct.barcode}
+          onChange={(e) => {
+            const code = e.target.value;
+            setNewProduct({ ...newProduct, barcode: code });
+            fetchProductByBarcode(code);
+          }}
+        />
 
-      <select
-        value={newProduct.source_id}
-        onChange={(e) => setNewProduct({ ...newProduct, source_id: e.target.value })}
-      >
-        <option value="">Select Source</option>
-        {sourceList.map((s) => (
-          <option key={s.source_id} value={s.source_id}>
-            {s.name}
-          </option>
-        ))}
-      </select>
+        <label>Name</label>
+        <input
+          className="input"
+          value={newProduct.name}
+          onChange={(e) => setNewProduct({ ...newProduct, name: e.target.value })}
+        />
 
-      <div style={{ marginTop: "10px" }}>
-        <button onClick={handleAddProduct}>Save</button>
-        <button onClick={() => window.close()}>Cancel</button>
+        <label>Price</label>
+        <input
+          className="input"
+          value={newProduct.price}
+          onChange={(e) => setNewProduct({ ...newProduct, price: e.target.value })}
+        />
+
+        <label>Category</label>
+        <input
+          className="input"
+          value={newProduct.category}
+          onChange={(e) => setNewProduct({ ...newProduct, category: e.target.value })}
+        />
+
+        <label>Quantity</label>
+        <input
+          className="input"
+          type="number"
+          min="1"
+          value={newProduct.quantity}
+          onChange={(e) => setNewProduct({ ...newProduct, quantity: e.target.value })}
+        />
+
+        <label>Source</label>
+        <select
+          className="input"
+          value={newProduct.source_id}
+          onChange={(e) => setNewProduct({ ...newProduct, source_id: e.target.value })}
+        >
+          <option value="">Select Source</option>
+          {sourceList.map((s) => (
+            <option key={s.source_id} value={s.source_id}>
+              {s.name}
+            </option>
+          ))}
+        </select>
       </div>
-    </div>
+
+      <div className="form-actions">
+        <button className="btn" onClick={handleAddProduct}>Save</button>
+        <button
+          className="btn danger"
+          onClick={() =>
+            setNewProduct({ barcode: "", name: "", price: "", category: "", quantity: 1, source_id: "" })
+          }
+        >
+          Cancel
+        </button>
+      </div>
+    </section>
   );
 }
 

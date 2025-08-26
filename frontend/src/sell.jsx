@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import axios from "axios";
 import BarcodeScannerComponent from "react-qr-barcode-scanner";
 import "./App.css";
@@ -7,36 +7,40 @@ function Sell() {
   const [scanBarcode, setScanBarcode] = useState(false);
   const [barcodeInput, setBarcodeInput] = useState("");
   const [soldProducts, setSoldProducts] = useState([]); // list of products to sell
-  const [productsMap, setProductsMap] = useState({}); // barcode => product info
 
   // Fetch product by barcode
   const fetchProductByBarcode = async (code) => {
     if (!code) return;
 
-    // check if already in list
-    if (soldProducts.find((p) => p.barcode === code)) {
-      alert("Product already added");
-      return;
-    }
+    try {
+      const res = await axios.get(`http://localhost:8080/api/products/findByBarcode`, {
+        params: { barcode: code }
+      });
 
-     try {
-    // Send barcode as query param
-    const res = await axios.get(`http://localhost:8080/api/products/findByBarcode`, {
-      params: { barcode: code }
-    });
+      if (res.data.product) {
+        const price = Number(res.data.product.price);
 
-   if (res.data.product) {
-  const price = Number(res.data.product.price);
-  const prod = { ...res.data.product, quantity: 1, total: price };
-  setSoldProducts((prev) => [...prev, prod]);
-  setProductsMap((prev) => ({ ...prev, [code]: prod }));
-} else {
-      alert("Product not found");
+        setSoldProducts((prev) => {
+          const existing = prev.find((p) => p.barcode === code);
+          if (existing) {
+            // If product already in list, increase quantity by 1
+            return prev.map((p) =>
+              p.barcode === code
+                ? { ...p, quantity: p.quantity + 1, total: (p.quantity + 1) * price }
+                : p
+            );
+          } else {
+            const prod = { ...res.data.product, quantity: 1, total: price };
+            return [...prev, prod];
+          }
+        });
+      } else {
+        alert("Product not found");
+      }
+    } catch (err) {
+      alert("Error fetching product");
     }
-  } catch (err) {
-    alert("Error fetching product");
-  }
-};
+  };
 
   // Handle quantity change
   const handleQuantityChange = (barcode, qty) => {
@@ -44,7 +48,7 @@ function Sell() {
       prev.map((p) => {
         if (p.barcode === barcode) {
           const quantity = Number(qty) > 0 ? Number(qty) : 1;
-          return { ...p, quantity, total: quantity * Number(p.price)  };
+          return { ...p, quantity, total: quantity * Number(p.price) };
         }
         return p;
       })
@@ -57,40 +61,36 @@ function Sell() {
   };
 
   // Total amount of all products
-const totalAmount = soldProducts.reduce((sum, p) => sum + Number(p.total), 0);
+  const totalAmount = soldProducts.reduce((sum, p) => sum + Number(p.total), 0);
 
-
-  // Handle selling (you can implement backend call)
+  // Handle selling
   const handleSell = async () => {
-  if (soldProducts.length === 0) {
-    alert("No products selected");
-    return;
-  }
-
-  try {
-    const res = await axios.post("http://localhost:8080/api/products/sell", {
-      items: soldProducts.map((p) => ({
-        product_id: p.product_id,
-        quantity: p.quantity
-      }))
-    });
-
-    // Success message from backend
-    alert(res.data.message || "Products sold successfully");
-
-    // Clear sold products list
-    setSoldProducts([]);
-    setBarcodeInput("");
-  } catch (err) {
-    // Show backend error message if available
-    if (err.response?.data?.error) {
-      alert(err.response.data.error);
-    } else {
-      alert("Error selling products");
+    if (soldProducts.length === 0) {
+      alert("No products selected");
+      return;
     }
-  }
-};
 
+    try {
+      const res = await axios.post("http://localhost:8080/api/products/sell", {
+        items: soldProducts.map((p) => ({
+          product_id: p.product_id,
+          quantity: p.quantity
+        }))
+      });
+
+      alert(res.data.message || "Products sold successfully");
+
+      // Clear sold products list
+      setSoldProducts([]);
+      setBarcodeInput("");
+    } catch (err) {
+      if (err.response?.data?.error) {
+        alert(err.response.data.error);
+      } else {
+        alert("Error selling products");
+      }
+    }
+  };
 
   return (
     <div className="sell-panel">
@@ -119,7 +119,13 @@ const totalAmount = soldProducts.reduce((sum, p) => sum + Number(p.total), 0);
           value={barcodeInput}
           onChange={(e) => setBarcodeInput(e.target.value)}
         />
-        <button className="btn" onClick={() => { fetchProductByBarcode(barcodeInput); setBarcodeInput(""); }}>
+        <button
+          className="btn"
+          onClick={() => {
+            fetchProductByBarcode(barcodeInput);
+            setBarcodeInput("");
+          }}
+        >
           Add Product
         </button>
       </div>

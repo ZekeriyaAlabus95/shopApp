@@ -203,4 +203,37 @@ exports.sellProduct = async (req, res) => {
   }
 };
 
+exports.addOrIncrease = async (req, res) => {
+  try {
+    const { barcode, price, product_name, quantity, source_id, category } = req.body;
+
+    // Check if product already exists
+    const [existing] = await pool.query(
+      "SELECT product_id, quantity FROM product WHERE barcode = ?",
+      [barcode]
+    );
+
+    if (existing.length > 0) {
+      // Increase quantity
+      const newQty = Number(existing[0].quantity) + Number(quantity);
+      await pool.query("UPDATE product SET quantity = ? WHERE product_id = ?", [
+        newQty,
+        existing[0].product_id,
+      ]);
+      return res.json({ message: `✅ Product exists. Quantity increased by ${quantity}` });
+    }
+
+    // Insert new product
+    await pool.query(
+      `INSERT INTO product (barcode, price, date_accepted, product_name, quantity, source_id, category)
+       VALUES (?, ?, CURDATE(), ?, ?, ?, ?)`,
+      [barcode, price, product_name, quantity, source_id, category]
+    );
+
+    res.json({ message: "✅ Product added successfully" });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "❌ Database error" });
+  }
+};
 
