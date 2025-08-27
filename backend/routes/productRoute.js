@@ -10,6 +10,7 @@ const {
     deleteProduct,
     findByBarcode,
     sellProduct,
+    getCategories,
     addOrIncrease  // <-- new controller
 } = require("../controllers/productController");
 
@@ -27,5 +28,5 @@ router.put("/updateBySource", updateBySource);
 
 router.post("/sell", sellProduct);
 router.delete("/deleteProduct", deleteProduct);
-
+router.get("/categories", getCategories);
 module.exports = router;

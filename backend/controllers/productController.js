@@ -124,54 +124,68 @@ exports.updateProduct = async (req, res) => {
 };
 
 // PUT /updateAllProducts - example: increase all prices by a certain amount
+// PUT /updateAllProducts
 exports.updateAllProducts = async (req, res) => {
   try {
-    const { priceIncrease } = req.body; // number
-    await pool.query("UPDATE product SET price = price + ?", [priceIncrease]);
-    res.json({ message: "All products updated successfully" });
+    const { priceIncrease, type } = req.body; // type = 'number' or 'percentage'
+    if (type === "number") {
+      await pool.query("UPDATE product SET price = price + ?", [priceIncrease]);
+    } else if (type === "percentage") {
+      // e.g. priceIncrease = 10 means +10%, -5 means -5%
+      await pool.query("UPDATE product SET price = price * (1 + ? / 100)", [priceIncrease]);
+    } else {
+      return res.status(400).json({ error: "Invalid type. Must be 'number' or 'percentage'" });
+    }
+
+    res.json({ message: "✅ All products updated successfully" });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: "Database error" });
   }
 };
 
-// PUT /updateByCategory - update products by source_id (as a category example)
-exports.updateByCategory = async (req, res) => {
-  try {
-    const { source_id, changes } = req.body; // changes = { price, quantity }
-    const { price, quantity } = changes;
-    await pool.query(
-      "UPDATE product SET price = ?, quantity = ? WHERE source_id = ?",
-      [price, quantity, source_id]
-    );
-    res.json({
-      message: `Products from source ${source_id} updated successfully`,
-      changes,
-    });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: "Database error" });
-  }
-};
-
-// PUT /updateBySource - update products by source_id
+// PUT /updateBySource
 exports.updateBySource = async (req, res) => {
   try {
-    const { source_id, changes } = req.body; // changes = { price, quantity }
-    const { price, quantity } = changes;
-    await pool.query(
-      "UPDATE product SET price = ?, quantity = ? WHERE source_id = ?",
-      [price, quantity, source_id]
-    );
-    res.json({
-      message: `Products from source ${source_id} updated successfully`,
-      changes,
-    });
+    const { source_id, changes } = req.body;
+    const { price, type } = changes;
+
+    if (type === "number") {
+      await pool.query("UPDATE product SET price = price + ? WHERE source_id = ?", [price, source_id]);
+    } else if (type === "percentage") {
+      await pool.query("UPDATE product SET price = price * (1 + ? / 100) WHERE source_id = ?", [price, source_id]);
+    } else {
+      return res.status(400).json({ error: "Invalid type. Must be 'number' or 'percentage'" });
+    }
+
+    res.json({ message: `Products from source ${source_id} updated successfully` });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: "Database error" });
   }
 };
+
+// PUT /updateByCategory
+exports.updateByCategory = async (req, res) => {
+  try {
+    const { category, changes } = req.body;
+    const { price, type } = changes;
+
+    if (type === "number") {
+      await pool.query("UPDATE product SET price = price + ? WHERE category = ?", [price, category]);
+    } else if (type === "percentage") {
+      await pool.query("UPDATE product SET price = price * (1 + ? / 100) WHERE category = ?", [price, category]);
+    } else {
+      return res.status(400).json({ error: "Invalid type. Must be 'number' or 'percentage'" });
+    }
+
+    res.json({ message: `Products in category ${category} updated successfully` });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Database error" });
+  }
+};
+
 
 // DELETE /deleteProduct - delete a product by ID
 exports.deleteProduct = async (req, res) => {
@@ -310,3 +324,15 @@ exports.addOrIncrease = async (req, res) => {
     res.status(500).json({ error: "❌ Database error" });
   }
 };
+// GET /products/categories - fetch all unique categories
+exports.getCategories = async (req, res) => {
+  try {
+    const [rows] = await pool.query("SELECT DISTINCT category FROM product WHERE category IS NOT NULL");
+    const categories = rows.map(r => r.category);
+    res.json({ categories });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Database error fetching categories" });
+  }
+};
+

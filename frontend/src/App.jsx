@@ -1,23 +1,31 @@
 import { useState } from "react";
 import Product from "./product";
 import Source from "./source";
+import EditPrice from "./editPrice"; // Capitalized
 import "./App.css";
 
 function App() {
   const [activeTab, setActiveTab] = useState("products");
+
+  // Display name for the tabs
+  const tabLabels = {
+    products: "Products",
+    sources: "Sources",
+    editPrice: "Edit Price",
+  };
 
   return (
     <div className="app">
       <header className="topbar">
         <h1 className="brand">My Dashboard</h1>
         <nav className="tabs">
-          {["products", "sources"].map((tab) => (
+          {Object.keys(tabLabels).map((tab) => (
             <button
               key={tab}
               className={activeTab === tab ? "tab active" : "tab"}
               onClick={() => setActiveTab(tab)}
             >
-              {tab.charAt(0).toUpperCase() + tab.slice(1)}
+              {tabLabels[tab]}
             </button>
           ))}
         </nav>
@@ -26,6 +34,7 @@ function App() {
       <main className="content">
         {activeTab === "products" && <Product />}
         {activeTab === "sources" && <Source />}
+        {activeTab === "editPrice" && <EditPrice />}
       </main>
     </div>
   );
