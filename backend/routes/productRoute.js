@@ -5,7 +5,7 @@ const {
     addProduct,
     updateProduct,
     updateAllProducts,
-    updateByCayegory,
+    updateByCategory,
     updateBySource,
     deleteProduct,
     findByBarcode,
@@ -22,7 +22,7 @@ router.post("/addOrIncrease", addOrIncrease); // <-- new POST endpoint
 
 router.put("/update", updateProduct);
 router.put("/updateAllProducts", updateAllProducts);
-router.put("/updateByCategory", updateByCayegory);
+router.put("/updateByCategory", updateByCategory);
 router.put("/updateBySource", updateBySource);
 
 router.post("/sell", sellProduct);

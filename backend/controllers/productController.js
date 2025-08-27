@@ -5,14 +5,31 @@ const pool = require("../config/db");
 exports.listAll = async (req, res) => {
   try {
     const [rows] = await pool.query(
-      "SELECT p.*, s.name FROM product p  join source s using(source_id) where quantity > 0 "
+      "SELECT p.*, s.name FROM product p JOIN source s USING(source_id) WHERE quantity > 0"
     );
-    res.json({ products: rows });
+
+    // Convert backend date string to local YYYY-MM-DD
+    const localDate = (isoDate) => {
+      if (!isoDate) return null;
+      const d = new Date(isoDate);
+      const yyyy = d.getFullYear();
+      const mm = String(d.getMonth() + 1).padStart(2, "0"); // month is 0-indexed
+      const dd = String(d.getDate()).padStart(2, "0");
+      return `${yyyy}-${mm}-${dd}`;
+    };
+
+    const products = rows.map((row) => ({
+      ...row,
+      date_accepted: localDate(row.date_accepted),
+    }));
+
+    res.json({ products });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: "Database error" });
   }
 };
+
 
 // GET /show - fetch a single product by ID
 
@@ -22,11 +39,12 @@ exports.addProduct = async (req, res) => {
   try {
     const { barcode, price, product_name, quantity, source_id, category } =
       req.body;
+    const today = new Date().toISOString().split("T")[0];
 
     await pool.query(
       `INSERT INTO product (barcode, price, date_accepted, product_name, quantity, source_id, category) 
-       VALUES (?, ?, CURDATE(), ?, ?, ?, ?)`,
-      [barcode, price, product_name, quantity, source_id, category]
+       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      [barcode, price, today, product_name, quantity, source_id, category]
     );
 
     res.json({ message: "✅ Product added successfully" });
@@ -35,11 +53,9 @@ exports.addProduct = async (req, res) => {
 
     // Check for duplicate entry error
     if (err.code === "ER_DUP_ENTRY") {
-      res
-        .status(400)
-        .json({
-          error: `Duplicate entry: barcode '${req.body.barcode}' already exists.`,
-        });
+      res.status(400).json({
+        error: `Duplicate entry: barcode '${req.body.barcode}' already exists.`,
+      });
     } else {
       res.status(500).json({ error: "❌ Database error" });
     }
@@ -49,16 +65,31 @@ exports.addProduct = async (req, res) => {
 // PUT /update - update a product by ID
 exports.updateProduct = async (req, res) => {
   try {
-    console.log("zAXsasd");
-    const {
-      product_id,
-      barcode,
-      price,
-      date_accepted,
-      product_name,
-      quantity,
-      source_id,
-    } = req.body;
+    const { product_id, barcode, price, product_name, quantity, source_id } =
+      req.body;
+
+    // Backend validation
+    if (
+      !product_id ||
+      !barcode ||
+      !product_name ||
+      !price ||
+      !quantity ||
+      !source_id
+    ) {
+      return res.status(400).json({ error: "All fields are required" });
+    }
+
+    if (isNaN(price) || Number(price) < 0) {
+      return res.status(400).json({ error: "Price must be a positive number" });
+    }
+
+    if (!Number.isInteger(Number(quantity)) || Number(quantity) < 0) {
+      return res
+        .status(400)
+        .json({ error: "Quantity must be a positive integer" });
+    }
+
     await pool.query(
       "UPDATE product SET barcode = ?, price = ?, product_name = ?, quantity = ?, source_id = ? WHERE product_id = ?",
       [barcode, price, product_name, quantity, source_id, product_id]
@@ -69,7 +100,6 @@ exports.updateProduct = async (req, res) => {
       updated: {
         barcode,
         price,
-        date_accepted,
         product_name,
         quantity,
         source_id,
@@ -77,7 +107,7 @@ exports.updateProduct = async (req, res) => {
     });
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: "Databasegdf error" });
+    res.status(500).json({ error: "Database error" });
   }
 };
 
