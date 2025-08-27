@@ -7,7 +7,7 @@
   text-align: left;     /* dashboards usually left-align */
 }
 
-/* === Original Vite Logo styles kept (optional if you still use logos) === */
+/* === Original Vite Logo styles (can remove if unused) === */
 .logo {
   height: 6em;
   padding: 1.5em;
@@ -61,7 +61,7 @@
   align-items: center;
   padding: 1rem 2rem;
   border-bottom: 1px solid #334155;
-  position: sticky; /* keeps header visible on scroll */
+  position: sticky;
   top: 0;
   background: #0f172a;
   z-index: 10;
@@ -100,13 +100,13 @@
 
 .panel {
   margin-top: 1rem;
-  background: #1e293b; /* darker panel background */
+  background: #1e293b;
   padding: 1.5rem;
   border-radius: 0.75rem;
   box-shadow: 0 4px 8px rgba(0,0,0,0.3);
 }
 
-/* Action button */
+/* Buttons */
 .btn {
   background: #60a5fa;
   color: white;
@@ -115,13 +115,19 @@
   border-radius: 0.5rem;
   cursor: pointer;
   font-size: 1rem;
-   margin-top: 0.5rem;   /* space above button */
-  margin-bottom: 0.5rem; /* space below button */
+   margin: 10px;
 }
-
 .btn:hover {
   background: #3b82f6;
 }
+.btn.danger {
+  background: #ef4444;
+}
+.btn.danger:hover {
+  background: #dc2626;
+}
+
+/* Product table */
 .product-table {
   width: 100%;
   border-collapse: collapse;
@@ -156,45 +162,47 @@
 .product-table tr:hover {
   background: #0f172a;
 }
-/* Form styling for spacing between fields */
+
+/* === Form styles === */
+.form {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr); /* 3 groups per row */
+  gap: 1rem; /* space between groups */
+  margin: 20px;
+}
+
 .form-group {
   display: flex;
-  flex-direction: column; /* label on top of input */
-  margin-bottom: 1rem;   /* space between fields */
+  flex-direction: column;
+  
 }
 
 .form-group label {
-  margin-bottom: 0.3rem; /* space between label and input */
+  margin-bottom: 0.3rem; /* tighter label-input spacing */
   font-weight: 500;
   color: #60a5fa;
+  font-size: 1.2rem;
+  
+
 }
 
+
 .input {
-  padding: 0.5rem 0.8rem; /* internal padding inside the input */
+padding: 0.5rem 0.8rem;
   border-radius: 0.5rem;
   border: 1px solid #334155;
   background: #0f172a;
   color: #e5e7eb;
+  height: 40px;
+  }
+select {
+   /* control width */
+  height: 57px !important;     /* control height */
+  font-size: 18px;
 }
 
-.input:focus {
+.input:focus,
+select:focus {
   outline: none;
   border-color: #60a5fa;
-}
-/* Space between label and input */
-label {
-  display: block;       /* ensure label is above the field */
-  margin-bottom: 0.4rem; /* space below label */
-  font-weight: 500;
-  color: #60a5fa;
-}
-
-/* Optional: add padding inside inputs */
-.input {
-  padding: 0.5rem 0.8rem; /* inner padding for better spacing */
-  border-radius: 0.5rem;
-  border: 1px solid #334155;
-  background: #0f172a;
-  color: #e5e7eb;
-   margin : 1rem;
 }

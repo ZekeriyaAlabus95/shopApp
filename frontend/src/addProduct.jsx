@@ -28,7 +28,6 @@ function AddProduct({ onProductAdded }) {
     }
   };
 
-  // Auto-fill product info if barcode exists
   const fetchProductByBarcode = async (barcode) => {
     if (!barcode) return;
     try {
@@ -44,10 +43,9 @@ function AddProduct({ onProductAdded }) {
           price: product.price,
           category: product.category,
           source_id: product.source_id,
-          // keep quantity as user input
         }));
       }
-    } catch (err) {
+    } catch {
       console.log("Product not found, can add as new");
     }
   };
@@ -71,7 +69,6 @@ function AddProduct({ onProductAdded }) {
 
       alert("Product added or quantity increased successfully");
 
-      // Reset form
       setNewProduct({
         barcode: "",
         name: "",
@@ -114,68 +111,89 @@ function AddProduct({ onProductAdded }) {
       )}
 
       <div className="form">
-        <label>Barcode</label>
-        <input
-          className="input"
-          value={newProduct.barcode}
-          onChange={(e) => {
-            const code = e.target.value;
-            setNewProduct({ ...newProduct, barcode: code });
-            fetchProductByBarcode(code);
-          }}
-        />
+        <div className="form-group">
+          <label>Barcode</label>
+          <input
+            className="input"
+            value={newProduct.barcode}
+            onChange={(e) => {
+              const code = e.target.value;
+              setNewProduct({ ...newProduct, barcode: code });
+              fetchProductByBarcode(code);
+            }}
+          />
+        </div>
 
-        <label>Name</label>
-        <input
-          className="input"
-          value={newProduct.name}
-          onChange={(e) => setNewProduct({ ...newProduct, name: e.target.value })}
-        />
+        <div className="form-group">
+          <label>Name</label>
+          <input
+            className="input"
+            value={newProduct.name}
+            onChange={(e) => setNewProduct({ ...newProduct, name: e.target.value })}
+          />
+        </div>
 
-        <label>Price</label>
-        <input
-          className="input"
-          value={newProduct.price}
-          onChange={(e) => setNewProduct({ ...newProduct, price: e.target.value })}
-        />
+        <div className="form-group">
+          <label>Price</label>
+          <input
+            className="input"
+            value={newProduct.price}
+            onChange={(e) => setNewProduct({ ...newProduct, price: e.target.value })}
+          />
+        </div>
 
-        <label>Category</label>
-        <input
-          className="input"
-          value={newProduct.category}
-          onChange={(e) => setNewProduct({ ...newProduct, category: e.target.value })}
-        />
+        <div className="form-group">
+          <label>Category</label>
+          <input
+            className="input"
+            value={newProduct.category}
+            onChange={(e) => setNewProduct({ ...newProduct, category: e.target.value })}
+          />
+        </div>
 
-        <label>The New Quantity</label>
-        <input
-          className="input"
-          type="number"
-          min="1"
-          value={newProduct.quantity}
-          onChange={(e) => setNewProduct({ ...newProduct, quantity: e.target.value })}
-        />
+        <div className="form-group">
+          <label>The New Quantity</label>
+          <input
+            className="input"
+            type="number"
+            min="1"
+            value={newProduct.quantity}
+            onChange={(e) => setNewProduct({ ...newProduct, quantity: e.target.value })}
+          />
+        </div>
 
-        <label>Source</label>
-        <select
-          className="input"
-          value={newProduct.source_id}
-          onChange={(e) => setNewProduct({ ...newProduct, source_id: e.target.value })}
-        >
-          <option value="">Select Source</option>
-          {sourceList.map((s) => (
-            <option key={s.source_id} value={s.source_id}>
-              {s.name}
-            </option>
-          ))}
-        </select>
+        <div className="form-group">
+          <label>Source</label>
+          <select
+            className="input"
+            value={newProduct.source_id}
+            onChange={(e) => setNewProduct({ ...newProduct, source_id: e.target.value })}
+          >
+            <option value="">Select Source</option>
+            {sourceList.map((s) => (
+              <option key={s.source_id} value={s.source_id}>
+                {s.name}
+              </option>
+            ))}
+          </select>
+        </div>
       </div>
 
       <div className="form-actions">
-        <button className="btn" onClick={handleAddProduct}>Save</button>
+        <button className="btn" onClick={handleAddProduct}>
+          Save
+        </button>
         <button
           className="btn danger"
           onClick={() =>
-            setNewProduct({ barcode: "", name: "", price: "", category: "", quantity: 1, source_id: "" })
+            setNewProduct({
+              barcode: "",
+              name: "",
+              price: "",
+              category: "",
+              quantity: 1,
+              source_id: "",
+            })
           }
         >
           Cancel

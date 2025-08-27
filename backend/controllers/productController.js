@@ -94,7 +94,7 @@ exports.updateAllProducts = async (req, res) => {
 };
 
 // PUT /updateByCategory - update products by source_id (as a category example)
-exports.updateByCayegory = async (req, res) => {
+exports.updateByCategory = async (req, res) => {
   try {
     const { source_id, changes } = req.body; // changes = { price, quantity }
     const { price, quantity } = changes;
