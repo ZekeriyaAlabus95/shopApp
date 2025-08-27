@@ -1,66 +1,87 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import axios from "axios";
+import "./App.css";
 
-export default function AddSource({ onSourceAdded, onClose }) {
-  const [source, setSource] = useState({ name: "", phone: "", address: "" });
+function AddSource({ onSourceAdded }) {
+  const [newSource, setNewSource] = useState({ name: "", phone: "", address: "" });
   const [loading, setLoading] = useState(false);
 
-  const handleAdd = async () => {
-    if (!source.name.trim()) {
-      alert("Source name is required");
+  const handleAddSource = async () => {
+    const { name, phone } = newSource;
+
+    if (!name.trim()) {
+      alert("Name is required");
+      return;
+    }
+
+    // Phone validation: digits only
+    if (phone && !/^\d+$/.test(phone)) {
+      alert("Phone must contain digits only");
       return;
     }
 
     setLoading(true);
     try {
-      const res = await axios.post("http://localhost:8080/api/sources/addSource", source);
+      const res = await axios.post("http://localhost:8080/api/sources/addSource", newSource);
       alert(res.data.message);
-      onSourceAdded({
-        source_id: res.data.source_id,
-        ...source,
-      });
-      setSource({ name: "", phone: "", address: "" });
-      onClose();
+      onSourceAdded({ source_id: res.data.source_id, ...newSource });
+      setNewSource({ name: "", phone: "", address: "" });
     } catch (err) {
       console.error(err);
-      alert("Error adding source");
+      alert(err.response?.data?.error || "Error adding source");
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="modal-overlay">
-      <div className="modal">
-        <h3>Add Source</h3>
-        <input
-          type="text"
-          placeholder="Name"
-          value={source.name}
-          onChange={(e) => setSource({ ...source, name: e.target.value })}
-        />
-        <input
-          type="text"
-          placeholder="Phone"
-          value={source.phone}
-          onChange={(e) => setSource({ ...source, phone: e.target.value })}
-        />
-        <input
-          type="text"
-          placeholder="Address"
-          value={source.address}
-          onChange={(e) => setSource({ ...source, address: e.target.value })}
-        />
+    <section className="panel">
+      <div className="panel-header">
+        <h2>Add Source</h2>
+      </div>
 
-        <div style={{ textAlign: "right", marginTop: "1rem" }}>
-          <button className="btn" onClick={handleAdd} disabled={loading}>
-            {loading ? "Saving..." : "Save"}
-          </button>
-          <button className="btn" style={{ marginLeft: "10px" }} onClick={onClose}>
-            Cancel
-          </button>
+      <div className="form">
+        <div className="form-group">
+          <label>Name</label>
+          <input
+            className="input"
+            value={newSource.name}
+            onChange={(e) => setNewSource({ ...newSource, name: e.target.value })}
+          />
+        </div>
+
+        <div className="form-group">
+          <label>Phone</label>
+          <input
+            className="input"
+            value={newSource.phone}
+            onChange={(e) => setNewSource({ ...newSource, phone: e.target.value })}
+          />
+        </div>
+
+        <div className="form-group">
+          <label>Address</label>
+          <input
+            className="input"
+            value={newSource.address}
+            onChange={(e) => setNewSource({ ...newSource, address: e.target.value })}
+          />
         </div>
       </div>
-    </div>
+
+      <div className="form-actions">
+        <button className="btn" onClick={handleAddSource} disabled={loading}>
+          {loading ? "Saving..." : "Save"}
+        </button>
+        <button
+          className="btn danger"
+          onClick={() => setNewSource({ name: "", phone: "", address: "" })}
+        >
+          Cancel
+        </button>
+      </div>
+    </section>
   );
 }
+
+export default AddSource;

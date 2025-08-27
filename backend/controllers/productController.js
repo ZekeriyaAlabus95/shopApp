@@ -37,12 +37,24 @@ exports.listAll = async (req, res) => {
 // controllers/productController.js
 exports.addProduct = async (req, res) => {
   try {
-    const { barcode, price, product_name, quantity, source_id, category } =
-      req.body;
+    const { barcode, price, product_name, quantity, source_id, category } = req.body;
+
+    // --- Validation ---
+    if (isNaN(price) || Number(price) < 0) {
+      return res.status(400).json({ error: "Price must be a positive number" });
+    }
+    if (!Number.isInteger(Number(quantity)) || Number(quantity) < 0) {
+      return res.status(400).json({ error: "Quantity must be a positive integer" });
+    }
+    if (!product_name || !barcode) {
+      return res.status(400).json({ error: "Barcode and product name are required" });
+    }
+
     const today = new Date().toISOString().split("T")[0];
 
     await pool.query(
-      `INSERT INTO product (barcode, price, date_accepted, product_name, quantity, source_id, category) 
+      `INSERT INTO product 
+        (barcode, price, date_accepted, product_name, quantity, source_id, category) 
        VALUES (?, ?, ?, ?, ?, ?, ?)`,
       [barcode, price, today, product_name, quantity, source_id, category]
     );
@@ -51,7 +63,6 @@ exports.addProduct = async (req, res) => {
   } catch (err) {
     console.error(err);
 
-    // Check for duplicate entry error
     if (err.code === "ER_DUP_ENTRY") {
       res.status(400).json({
         error: `Duplicate entry: barcode '${req.body.barcode}' already exists.`,
@@ -61,6 +72,7 @@ exports.addProduct = async (req, res) => {
     }
   }
 };
+
 
 // PUT /update - update a product by ID
 exports.updateProduct = async (req, res) => {
