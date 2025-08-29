@@ -8,19 +8,16 @@ function EditPrice() {
   const [products, setProducts] = useState([]);
   const [sourceList, setSourceList] = useState([]);
   const [categoryList, setCategoryList] = useState([]);
-  const [filter, setFilter] = useState("all"); 
-  const [priceType, setPriceType] = useState("number"); 
+  const [filter, setFilter] = useState("all");
+  const [priceType, setPriceType] = useState("number");
   const [priceValue, setPriceValue] = useState("");
-  const [selectedProducts, setSelectedProducts] = useState([]);
+  const [selectedProducts, setSelectedProducts] = useState([]); // ✅ start empty
   const [selectedSource, setSelectedSource] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("");
   const [alertMsg, setAlertMsg] = useState("");
   const [loading, setLoading] = useState(false);
-  const [selectAll, setSelectAll] = useState(true);
   const [search, setSearch] = useState("");
   const [scanBarcode, setScanBarcode] = useState(false);
-  const [searchByProduct, setSearchByProduct] = useState(true);
-  const [searchBySource, setSearchBySource] = useState(false);
 
   useEffect(() => {
     fetchProducts();
@@ -32,8 +29,7 @@ function EditPrice() {
     try {
       const res = await axios.get("http://localhost:8080/api/products/list");
       setProducts(res.data.products || []);
-      setSelectedProducts(res.data.products.map(p => p.product_id));
-      setSelectAll(true);
+      setSelectedProducts([]); // clear selection by default
     } catch {
       alert("Error fetching products");
     }
@@ -58,86 +54,111 @@ function EditPrice() {
   };
 
   const handleApplyPrice = async () => {
-    if (isNaN(priceValue) || priceValue === "") {
-      setAlertMsg("❌ Price must be a number");
-      setTimeout(() => setAlertMsg(""), 10000);
+  if (isNaN(priceValue) || priceValue === "") {
+    setAlertMsg("❌ Price must be a number");
+    setTimeout(() => setAlertMsg(""), 5000);
+    return;
+  }
+
+  // Determine the products to update
+  let productsToUpdate = [];
+
+  if (filter === "all") {
+    productsToUpdate = selectedProducts;
+  } else if (filter === "bySource") {
+    if (!selectedSource) {
+      setAlertMsg("❌ Select a source first");
+      setTimeout(() => setAlertMsg(""), 5000);
       return;
     }
-
-    setLoading(true);
-    let payload = {};
-
-    try {
-      if (filter === "all") {
-        payload = { priceIncrease: Number(priceValue), type: priceType };
-        await axios.put("http://localhost:8080/api/products/updateAllProducts", payload);
-      } else if (filter === "bySource") {
-        if (!selectedSource) {
-          alert("Select a source first");
-          setLoading(false);
-          return;
-        }
-        payload = {
-          source_id: selectedSource,
-          changes: { price: Number(priceValue), type: priceType },
-        };
-        await axios.put("http://localhost:8080/api/products/updateBySource", payload);
-      } else if (filter === "byCategory") {
-        if (!selectedCategory) {
-          alert("Select a category first");
-          setLoading(false);
-          return;
-        }
-        payload = {
-          category: selectedCategory,
-          changes: { price: Number(priceValue), type: priceType },
-        };
-        await axios.put("http://localhost:8080/api/products/updateByCategory", payload);
-      }
-
-      setAlertMsg("✅ Prices updated successfully!");
-      fetchProducts();
-      setPriceValue("");
-    } catch {
-      setAlertMsg("❌ Error updating prices");
-    } finally {
-      setTimeout(() => setAlertMsg(""), 10000);
-      setLoading(false);
+    productsToUpdate = filteredProducts
+      .filter(p => selectedProducts.includes(p.product_id))
+      .map(p => p.product_id);
+  } else if (filter === "byCategory") {
+    if (!selectedCategory) {
+      setAlertMsg("❌ Select a category first");
+      setTimeout(() => setAlertMsg(""), 5000);
+      return;
     }
-  };
+    productsToUpdate = filteredProducts
+      .filter(p => selectedProducts.includes(p.product_id))
+      .map(p => p.product_id);
+  }
 
+  if (productsToUpdate.length === 0) {
+    setAlertMsg("❌ Please select at least one product!");
+    setTimeout(() => setAlertMsg(""), 5000);
+    return;
+  }
+
+  setLoading(true);
+
+  try {
+    const payload = {
+      product_ids: productsToUpdate,
+      changes: { price: Number(priceValue), type: priceType },
+    };
+    await axios.put(
+      "http://localhost:8080/api/products/updateSelected",
+      payload
+    );
+
+    setAlertMsg("✅ Prices updated successfully!");
+    fetchProducts();
+    setPriceValue("");
+  } catch {
+    setAlertMsg("❌ Error updating prices");
+  } finally {
+    setTimeout(() => setAlertMsg(""), 5000);
+    setLoading(false);
+  }
+};
+
+
+
+  // ✅ Filtered products based on search and filter
+  const filteredProducts = useMemo(() => {
+    return products.filter((p) => {
+      const matchFilter =
+        filter === "all" ||
+        (filter === "bySource" && p.source_id === Number(selectedSource)) ||
+        (filter === "byCategory" &&
+          (p.category || "").toLowerCase() === selectedCategory.toLowerCase());
+
+      const lowerSearch = search.toLowerCase();
+      const matchSearch =
+        !search.trim() ||
+        (p.product_name && p.product_name.toLowerCase().includes(lowerSearch)) ||
+        (p.category && p.category.toLowerCase().includes(lowerSearch)) ||
+        (sourceList.find((s) => s.source_id === p.source_id)?.name || "")
+          .toLowerCase()
+          .includes(lowerSearch);
+
+      return matchFilter && matchSearch;
+    });
+  }, [products, filter, selectedSource, selectedCategory, search, sourceList]);
+
+  // ✅ Select/Deselect all filtered products
   const toggleSelectAll = () => {
-    if (selectAll) {
-      setSelectedProducts([]);
+    const filteredIds = filteredProducts.map((p) => p.product_id);
+    const allSelected = filteredIds.every((id) => selectedProducts.includes(id));
+
+    if (allSelected) {
+      // Deselect all filtered products
+      setSelectedProducts(selectedProducts.filter((id) => !filteredIds.includes(id)));
     } else {
-      setSelectedProducts(products.map(p => p.product_id));
+      // Select all filtered products
+      setSelectedProducts([...new Set([...selectedProducts, ...filteredIds])]);
     }
-    setSelectAll(!selectAll);
   };
 
   const toggleProductSelection = (product_id) => {
     if (selectedProducts.includes(product_id)) {
-      setSelectedProducts(selectedProducts.filter(id => id !== product_id));
+      setSelectedProducts(selectedProducts.filter((id) => id !== product_id));
     } else {
       setSelectedProducts([...selectedProducts, product_id]);
     }
   };
-
-  const filteredProducts = useMemo(() => {
-    return products.filter(p => {
-      const matchFilter =
-        (filter === "all") ||
-        (filter === "bySource" && p.source_id === Number(selectedSource)) ||
-        (filter === "byCategory" && (p.category || "").toLowerCase() === selectedCategory.toLowerCase());
-
-      const matchSearch = !search.trim() || (
-        (searchByProduct && (p.product_name || "").toLowerCase().includes(search.toLowerCase())) ||
-        (searchBySource && (p.name || "").toLowerCase().includes(search.toLowerCase()))
-      );
-
-      return matchFilter && matchSearch;
-    });
-  }, [products, filter, selectedSource, selectedCategory, search, searchByProduct, searchBySource]);
 
   return (
     <section className="panel">
@@ -146,60 +167,108 @@ function EditPrice() {
       </div>
 
       {alertMsg && (
-        <div style={{ color: alertMsg.includes("❌") ? "red" : "green", marginBottom: "10px" }}>
+        <div
+          style={{
+            color: alertMsg.includes("❌") ? "red" : "green",
+            marginBottom: "10px",
+          }}
+        >
           {alertMsg}
         </div>
       )}
 
-      {/* Top Row: Filters + Price */}
-      <div className="grid-top" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(120px, 1fr))", gap: "10px", marginBottom: "1rem" }}>
-        <select className="input" value={filter} onChange={e => setFilter(e.target.value)}>
+      {/* Filters + Price */}
+      <div
+        className="grid-top"
+        style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(auto-fit, minmax(120px, 1fr))",
+          gap: "10px",
+          marginBottom: "1rem",
+        }}
+      >
+        <select
+          className="input"
+          value={filter}
+          onChange={(e) => setFilter(e.target.value)}
+        >
           <option value="all">All Products</option>
           <option value="bySource">By Source</option>
           <option value="byCategory">By Category</option>
         </select>
 
         {filter === "bySource" && (
-          <select className="input" value={selectedSource} onChange={e => setSelectedSource(e.target.value)}>
+          <select
+            className="input"
+            value={selectedSource}
+            onChange={(e) => setSelectedSource(e.target.value)}
+          >
             <option value="">-- Select Source --</option>
-            {sourceList.map(s => (
-              <option key={s.source_id} value={s.source_id}>{s.name}</option>
+            {sourceList.map((s) => (
+              <option key={s.source_id} value={s.source_id}>
+                {s.name}
+              </option>
             ))}
           </select>
         )}
 
         {filter === "byCategory" && (
-          <select className="input" value={selectedCategory} onChange={e => setSelectedCategory(e.target.value)}>
+          <select
+            className="input"
+            value={selectedCategory}
+            onChange={(e) => setSelectedCategory(e.target.value)}
+          >
             <option value="">-- Select Category --</option>
-            {categoryList.map(c => (
-              <option key={c} value={c}>{c}</option>
+            {categoryList.map((c) => (
+              <option key={c} value={c}>
+                {c}
+              </option>
             ))}
           </select>
         )}
 
-        <select className="input" value={priceType} onChange={e => setPriceType(e.target.value)}>
+        <select
+          className="input"
+          value={priceType}
+          onChange={(e) => setPriceType(e.target.value)}
+        >
           <option value="number">Number</option>
           <option value="percentage">Percentage</option>
         </select>
 
-        <input className="input" type="text" value={priceValue} onChange={e => setPriceValue(e.target.value)} placeholder="Value" />
-        <button className="btn" onClick={handleApplyPrice} disabled={loading}>{loading ? "Applying..." : "Apply"}</button>
+        <input
+          className="input"
+          type="text"
+          value={priceValue}
+          onChange={(e) => setPriceValue(e.target.value)}
+          placeholder="Value"
+        />
+        <button className="btn" onClick={handleApplyPrice} disabled={loading}>
+          {loading ? "Applying..." : "Apply"}
+        </button>
       </div>
 
-      {/* Second Row: Search checkboxes */}
-      <div style={{ display: "flex", gap: "10px", marginBottom: "0.5rem", flexWrap: "wrap" }}>
-        <label>
-          <input type="checkbox" checked={searchByProduct} onChange={() => setSearchByProduct(!searchByProduct)} defaultChecked /> Product
-        </label>
-        <label>
-          <input type="checkbox" checked={searchBySource} onChange={() => setSearchBySource(!searchBySource)} /> Source
-        </label>
-      </div>
-
-      {/* Third Row: Search bar + Scanner */}
-      <div style={{ display: "flex", gap: "10px", alignItems: "center", marginBottom: "1rem", flexWrap: "wrap" }}>
-        <input style={{ flexGrow: 1, minWidth: "200px" }} className="input" type="text" placeholder="Search..." value={search} onChange={e => setSearch(e.target.value)} />
-        <button className="btn" onClick={() => setScanBarcode(!scanBarcode)}>{scanBarcode ? "Stop Scanner" : "Scan Barcode"}</button>
+      {/* Search + Scanner */}
+      <div
+        style={{
+          display: "flex",
+          gap: "10px",
+          alignItems: "center",
+          marginBottom: "1rem",
+          flexWrap: "wrap",
+        }}
+      >
+        <input
+          style={{ flexGrow: 1, minWidth: "200px" }}
+          className="input"
+          type="text"
+          placeholder="Search products or sources..."
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+        />
+        <button className="btn" onClick={() => setScanBarcode(!scanBarcode)}>
+          {scanBarcode ? "Stop Scanner" : "Scan Barcode"}
+        </button>
       </div>
 
       {scanBarcode && (
@@ -210,9 +279,12 @@ function EditPrice() {
             onUpdate={async (err, result) => {
               if (result) {
                 try {
-                  const res = await axios.get("http://localhost:8080/api/products/findByBarcode", { params: { barcode: result.text } });
+                  const res = await axios.get(
+                    "http://localhost:8080/api/products/findByBarcode",
+                    { params: { barcode: result.text } }
+                  );
                   setProducts([res.data.product]);
-                  setSelectedProducts([res.data.product.product_id]);
+                  setSelectedProducts([]);
                   setScanBarcode(false);
                 } catch {
                   alert("Product not found");
@@ -228,7 +300,13 @@ function EditPrice() {
         <h3>
           Products{" "}
           <label style={{ fontWeight: "normal", marginLeft: "10px" }}>
-            <input type="checkbox" checked={selectAll} onChange={toggleSelectAll} /> Select All
+            <input type="checkbox" onChange={toggleSelectAll} 
+              checked={
+                filteredProducts.length > 0 &&
+                filteredProducts.every((p) => selectedProducts.includes(p.product_id))
+              } 
+            />{" "}
+            Select All
           </label>
         </h3>
         <table className="product-table">
@@ -242,14 +320,18 @@ function EditPrice() {
             </tr>
           </thead>
           <tbody>
-            {filteredProducts.map(p => (
+            {filteredProducts.map((p) => (
               <tr key={p.product_id}>
                 <td>
-                  <input type="checkbox" checked={selectedProducts.includes(p.product_id)} onChange={() => toggleProductSelection(p.product_id)} />
+                  <input
+                    type="checkbox"
+                    checked={selectedProducts.includes(p.product_id)}
+                    onChange={() => toggleProductSelection(p.product_id)}
+                  />
                 </td>
                 <td>{p.product_name}</td>
                 <td>${p.price}</td>
-                <td>{p.name}</td>
+                <td>{sourceList.find((s) => s.source_id === p.source_id)?.name}</td>
                 <td>{p.category}</td>
               </tr>
             ))}

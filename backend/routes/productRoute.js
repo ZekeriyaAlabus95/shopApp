@@ -11,6 +11,7 @@ const {
     findByBarcode,
     sellProduct,
     getCategories,
+    updateSelectedProducts,
     addOrIncrease  // <-- new controller
 } = require("../controllers/productController");
 
@@ -25,6 +26,7 @@ router.put("/update", updateProduct);
 router.put("/updateAllProducts", updateAllProducts);
 router.put("/updateByCategory", updateByCategory);
 router.put("/updateBySource", updateBySource);
+router.put("/updateSelected", updateSelectedProducts);
 
 router.post("/sell", sellProduct);
 router.delete("/deleteProduct", deleteProduct);

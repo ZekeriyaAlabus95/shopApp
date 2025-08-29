@@ -8,6 +8,9 @@ function Sell() {
   const [barcodeInput, setBarcodeInput] = useState("");
   const [soldProducts, setSoldProducts] = useState([]); // list of products to sell
 
+  // Sound effect
+  const addProductSFX = new Audio("/sfx/add-product.mp3"); // sound in public/sfx/add-product.mp3
+
   // Fetch product by barcode
   const fetchProductByBarcode = async (code) => {
     if (!code) return;
@@ -22,17 +25,23 @@ function Sell() {
 
         setSoldProducts((prev) => {
           const existing = prev.find((p) => p.barcode === code);
+          let updated;
           if (existing) {
-            // If product already in list, increase quantity by 1
-            return prev.map((p) =>
+            updated = prev.map((p) =>
               p.barcode === code
                 ? { ...p, quantity: p.quantity + 1, total: (p.quantity + 1) * price }
                 : p
             );
           } else {
             const prod = { ...res.data.product, quantity: 1, total: price };
-            return [...prev, prod];
+            updated = [...prev, prod];
           }
+
+          // Play sound effect when product is added
+          addProductSFX.currentTime = 0;
+          addProductSFX.play();
+
+          return updated;
         });
       } else {
         alert("Product not found");

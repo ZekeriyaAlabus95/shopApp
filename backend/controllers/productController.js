@@ -335,4 +335,37 @@ exports.getCategories = async (req, res) => {
     res.status(500).json({ error: "Database error fetching categories" });
   }
 };
+// PUT /api/products/updateSelected
+// controllers/productController.js
+
+// PUT /api/products/updateSelected
+exports.updateSelectedProducts = async (req, res) => {
+  try {
+    const { product_ids, changes } = req.body;
+    const { price, type } = changes;
+
+    if (!Array.isArray(product_ids) || product_ids.length === 0) {
+      return res.status(400).json({ error: "No product IDs provided" });
+    }
+
+    // Build SQL dynamically
+    let query, params;
+    if (type === "number") {
+      query = `UPDATE product SET price = price + ? WHERE product_id IN (${product_ids.map(() => "?").join(",")})`;
+      params = [price, ...product_ids];
+    } else if (type === "percentage") {
+      query = `UPDATE product SET price = price * (1 + ? / 100) WHERE product_id IN (${product_ids.map(() => "?").join(",")})`;
+      params = [price, ...product_ids];
+    } else {
+      return res.status(400).json({ error: "Invalid type. Must be 'number' or 'percentage'" });
+    }
+
+    await pool.query(query, params);
+
+    res.json({ success: true, message: "✅ Selected products updated successfully" });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "❌ Error updating selected products" });
+  }
+};
 

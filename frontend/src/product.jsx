@@ -27,8 +27,6 @@ function Product() {
   const [editError, setEditError] = useState("");
 
   useEffect(() => {
-    const today = new Date().toISOString().split("T")[0];
-    console.log(today)
     fetchProducts();
     fetchSources();
   }, []);
@@ -78,7 +76,7 @@ function Product() {
       price: product.price,
       category: product.category || "",
       quantity: product.quantity,
-      source_id: product.source_id,
+      source_id: product.source_id || "",
     });
     setEditError("");
   };
@@ -108,9 +106,7 @@ function Product() {
       setEditingProduct(null);
       alert(res.data.message);
     } catch (err) {
-      setEditError(
-        err.response?.data?.error || "Error updating product"
-      );
+      setEditError(err.response?.data?.error || "Error updating product");
     }
   };
 
@@ -217,7 +213,7 @@ function Product() {
                       textAlign: "center",
                       lineHeight: "25px",
                       fontWeight: "bold",
-                      fontSize: "2rem"
+                      fontSize: "2rem",
                     }}
                     onClick={() => setSearch("")}
                   >
@@ -297,11 +293,10 @@ function Product() {
               <button
                 className="btn danger"
                 onClick={handleDeleteProducts}
-                disabled={selectedProducts.length === 0} // optional: disable if nothing selected
+                disabled={selectedProducts.length === 0}
               >
                 Delete Selected
               </button>
-
             </div>
 
             {scanBarcode && (
@@ -466,7 +461,26 @@ function Product() {
                         )}
                       </td>
                       <td>{p.date_accepted ? p.date_accepted.split("T")[0] : "-"}</td>
-                      <td>{p.name || "-"}</td>
+                      <td>
+                        {editingProduct === p.product_id ? (
+                          <select
+                            className="input"
+                            value={editForm.source_id}
+                            onChange={(e) =>
+                              setEditForm({ ...editForm, source_id: e.target.value })
+                            }
+                          >
+                            <option value="">-- Select Source --</option>
+                            {sourceList.map((s) => (
+                              <option key={s.source_id} value={s.source_id}>
+                                {s.name}
+                              </option>
+                            ))}
+                          </select>
+                        ) : (
+                          sourceList.find((s) => s.source_id === p.source_id)?.name || "-"
+                        )}
+                      </td>
                     </tr>
                   ))}
                 </tbody>
