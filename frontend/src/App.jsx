@@ -17,7 +17,7 @@ function App() {
   return (
     <div className="app">
       <header className="topbar">
-        <h1 className="brand">My Dashboard</h1>
+        <h1 className="brand">Shop Admin</h1>
         <nav className="tabs">
           {Object.keys(tabLabels).map((tab) => (
             <button

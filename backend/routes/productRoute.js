@@ -31,4 +31,5 @@ router.put("/updateSelected", updateSelectedProducts);
 router.post("/sell", sellProduct);
 router.delete("/deleteProduct", deleteProduct);
 router.get("/categories", getCategories);
+
 module.exports = router;

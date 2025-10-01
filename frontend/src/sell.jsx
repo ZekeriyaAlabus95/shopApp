@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import axios from "axios";
 import BarcodeScannerComponent from "react-qr-barcode-scanner";
 import "./App.css";
@@ -7,6 +7,7 @@ function Sell() {
   const [scanBarcode, setScanBarcode] = useState(false);
   const [barcodeInput, setBarcodeInput] = useState("");
   const [soldProducts, setSoldProducts] = useState([]); // list of products to sell
+  const scanCooldownRef = useRef(false); // prevent rapid multi-reads
 
   // Sound effect
   const addProductSFX = new Audio("/sfx/add-product.mp3"); // sound in public/sfx/add-product.mp3
@@ -111,13 +112,21 @@ function Sell() {
       </button>
 
       {scanBarcode && (
+        <div className="scanner-wrap">
         <BarcodeScannerComponent
           width={300}
           height={200}
           onUpdate={(err, result) => {
-            if (result) fetchProductByBarcode(result.text);
+            if (!result) return;
+            if (scanCooldownRef.current) return; // ignore if cooling down
+            scanCooldownRef.current = true;
+            fetchProductByBarcode(result.text);
+            setTimeout(() => {
+              scanCooldownRef.current = false;
+            }, 1000); // 1s delay to avoid auto-increment
           }}
         />
+        </div>
       )}
 
       {/* Manual barcode input */}
