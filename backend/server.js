@@ -38,5 +38,5 @@ app.delete("/api/sources/deleteSource", sources.deleteSource);
 // Health check
 app.get("/health", (c) => c.json({ ok: true }));
 
-// Export the Worker fetch handler (CommonJS for Wrangler)
-module.exports = { fetch: (...args) => app.fetch(...args) };
+// Export the Worker fetch handler as default export (ESM)
+export default app;
