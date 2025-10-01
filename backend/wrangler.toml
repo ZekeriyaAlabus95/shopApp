@@ -1,0 +1,19 @@
+name = "shop-backend"
+main = "backend/server.js"
+compatibility_date = "2025-10-01"
+compatibility_flags = ["nodejs_compat"]
+
+# Your Cloudflare account ID
+account_id = "<YOUR_ACCOUNT_ID>"
+
+# Bind your existing D1 database (SQLite) so it is accessible as env.DB
+# Replace database_name and database_id from `wrangler d1 list`
+[[d1_databases]]
+binding = "DB"                # usage in Worker: env.DB
+database_name = "shopadmin"     # your D1 database name
+database_id = "71f97dd4-f2f1-45ab-a06c-d9d422ea9311"
+
+# Local dev options
+[dev]
+port = 8080
+live_reload = true

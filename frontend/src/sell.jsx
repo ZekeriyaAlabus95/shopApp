@@ -88,7 +88,13 @@ function Sell() {
         }))
       });
 
-      alert(res.data.message || "Products sold successfully");
+      const txId = res.data?.transaction_id;
+      const total = res.data?.total_amount;
+      if (txId) {
+        alert(`Sale recorded. Transaction #${txId} | Total: $${Number(total).toFixed(2)}`);
+      } else {
+        alert(res.data.message || "Products sold successfully");
+      }
 
       // Clear sold products list
       setSoldProducts([]);

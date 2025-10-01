@@ -1,15 +1,14 @@
-
-// controllers/sourceController.js
-const pool = require("../config/db");
+// controllers/sourceController.js (Hono + Cloudflare D1)
 
 // GET /list - fetch all sources
-exports.listAll = async (req, res) => {
+exports.listAll = async (c) => {
     try {
-        const [rows] = await pool.query("SELECT * FROM source");
-        res.json({ sources: rows });
+        const result = await c.env.DB.prepare("SELECT * FROM source").all();
+        const rows = result.results || [];
+        return c.json({ sources: rows });
     } catch (err) {
         console.error(err);
-        res.status(500).json({ error: "Database error" });
+        return c.json({ error: "Database error" }, 500);
     }
 };
 
@@ -17,70 +16,70 @@ exports.listAll = async (req, res) => {
 
 
 // POST /addSource - add a new source
-exports.addSource = async (req, res) => {
+exports.addSource = async (c) => {
     try {
-        const { name, phone, address } = req.body;
+        const { name, phone, address } = await c.req.json();
 
         // --- Validation ---
         if (!name || !name.trim()) {
-            return res.status(400).json({ error: "Source name is required" });
+            return c.json({ error: "Source name is required" }, 400);
         }
 
         if (phone && !/^\d+$/.test(phone)) {
-            return res.status(400).json({ error: "Phone number must contain digits only" });
+            return c.json({ error: "Phone number must contain digits only" }, 400);
         }
 
-        const [result] = await pool.query(
-            "INSERT INTO source (name, phone, address) VALUES (?, ?, ?)",
-            [name, phone, address]
-        );
+        await c.env.DB.prepare(
+            "INSERT INTO source (name, phone, address) VALUES (?, ?, ?)"
+        ).bind(name, phone, address).run();
+        const idRes = await c.env.DB.prepare("SELECT last_insert_rowid() as id").all();
+        const sourceId = idRes.results && idRes.results[0] && idRes.results[0].id;
 
-        res.json({ 
+        return c.json({ 
             message: "✅ Source added successfully", 
-            source_id: result.insertId 
+            source_id: sourceId 
         });
     } catch (err) {
         console.error(err);
-        res.status(500).json({ error: "❌ Database error" });
+        return c.json({ error: "❌ Database error" }, 500);
     }
 };
 
 
 
 // PUT /updateSource - update a source by ID
-exports.updateSource = async (req, res) => {
+exports.updateSource = async (c) => {
     try {
-        const { source_id, newName, newPhone, newAddress } = req.body;
-        await pool.query(
-            "UPDATE source SET name = ?, phone = ?, address = ? WHERE source_id = ?",
-            [newName, newPhone, newAddress, source_id]
-        );
-        res.json({
+        const { source_id, newName, newPhone, newAddress } = await c.req.json();
+        await c.env.DB.prepare(
+            "UPDATE source SET name = ?, phone = ?, address = ? WHERE source_id = ?"
+        ).bind(newName, newPhone, newAddress, source_id).run();
+        return c.json({
             message: `Source ${source_id} updated successfully`,
             updated: { newName, newPhone, newAddress }
         });
     } catch (err) {
         console.error(err);
-        res.status(500).json({ error: "Database error" });
+        return c.json({ error: "Database error" }, 500);
     }
 };
 
-exports.deleteSource = async (req, res) => {
+exports.deleteSource = async (c) => {
   try {
-    const { source_ids } = req.body; // expecting an array of IDs
+    const { source_ids } = await c.req.json();
     if (!Array.isArray(source_ids) || source_ids.length === 0) {
-      return res.status(400).json({ error: "No source IDs provided" });
+      return c.json({ error: "No source IDs provided" }, 400);
     }
 
-    await pool.query(
-      "DELETE FROM source WHERE source_id IN (?)",
-      [source_ids]
-    );
+    const placeholders = source_ids.map(() => "?").join(",");
+    await c.env.DB.prepare(
+      `DELETE FROM source WHERE source_id IN (${placeholders})`
+    ).bind(...source_ids).run();
 
-    res.json({ message: `${source_ids.length} source(s) deleted successfully` });
+    return c.json({ message: `${source_ids.length} source(s) deleted successfully` });
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: "Database error" });
+    return c.json({ error: "Database error" }, 500);
   }
 };
 
