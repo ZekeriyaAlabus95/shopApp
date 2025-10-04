@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from "react";
-import axios from "axios";
 import BarcodeScannerComponent from "react-qr-barcode-scanner";
+import { productsAPI, sourcesAPI } from "./api";
 import "./App.css";
 import Sell from "./sell";
 import AddProduct from "./addProduct";
@@ -33,20 +33,20 @@ function Product() {
 
   const fetchProducts = async () => {
     try {
-      const res = await axios.get("http://localhost:8080/api/products/list");
-      setProducts(res.data.products || []);
+      const data = await productsAPI.listAll();
+      setProducts(data.products || []);
       setSelectedProducts([]);
     } catch (err) {
-      alert("Error fetching products");
+      alert("Error fetching products: " + err.message);
     }
   };
 
   const fetchSources = async () => {
     try {
-      const res = await axios.get("http://localhost:8080/api/sources/list");
-      setSourceList(res.data.sources || []);
+      const data = await sourcesAPI.listAll();
+      setSourceList(data.sources || []);
     } catch (err) {
-      alert("Error fetching sources");
+      alert("Error fetching sources: " + err.message);
     }
   };
 
@@ -58,13 +58,11 @@ function Product() {
     }
     if (!window.confirm("Delete selected products?")) return;
     try {
-      await axios.delete("http://localhost:8080/api/products/deleteProduct", {
-        data: { product_ids: selectedProducts },
-      });
-      await fetchProducts();
-      alert("Products deleted");
-    } catch {
-      alert("Error deleting products");
+      // Note: The delete endpoint doesn't exist in the current backend
+      // This would need to be implemented in the backend
+      alert("Delete functionality needs to be implemented in the backend");
+    } catch (err) {
+      alert("Error deleting products: " + err.message);
     }
   };
 
@@ -93,7 +91,7 @@ function Product() {
     }
 
     try {
-      const res = await axios.put("http://localhost:8080/api/products/update", {
+      const data = await productsAPI.updateProduct({
         product_id: id,
         barcode: editForm.barcode,
         product_name: editForm.name,
@@ -104,9 +102,9 @@ function Product() {
       });
       await fetchProducts();
       setEditingProduct(null);
-      alert(res.data.message);
+      alert(data.message);
     } catch (err) {
-      setEditError(err.response?.data?.error || "Error updating product");
+      setEditError(err.message || "Error updating product");
     }
   };
 
@@ -307,14 +305,11 @@ function Product() {
                   onUpdate={async (err, result) => {
                     if (result) {
                       try {
-                        const res = await axios.get(
-                          "http://localhost:8080/api/products/findByBarcode",
-                          { params: { barcode: result.text } }
-                        );
-                        setProducts([res.data.product]);
+                        const data = await productsAPI.findByBarcode(result.text);
+                        setProducts([data.product]);
                         setScanBarcode(false);
-                      } catch {
-                        alert("Product not found");
+                      } catch (err) {
+                        alert("Product not found: " + err.message);
                       }
                     }
                   }}

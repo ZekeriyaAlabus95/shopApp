@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
-import axios from "axios";
+import { sourcesAPI } from "./api";
 import AddSource from "./addSource"; // make sure filename matches
 import "./App.css";
 
@@ -18,11 +18,11 @@ function Source() {
 
   const fetchSources = async () => {
     try {
-      const res = await axios.get("http://localhost:8080/api/sources/list");
-      setSourceList(res.data.sources || []);
+      const data = await sourcesAPI.listAll();
+      setSourceList(data.sources || []);
       setSelectedSources([]);
-    } catch {
-      alert("Error fetching sources");
+    } catch (err) {
+      alert("Error fetching sources: " + err.message);
     }
   };
 
@@ -35,14 +35,12 @@ function Source() {
     if (!window.confirm("Delete selected sources?")) return;
 
     try {
-      await axios.delete("http://localhost:8080/api/sources/deleteSource", {
-        data: { source_ids: selectedSources },
-      });
+      await sourcesAPI.deleteSource(selectedSources);
       setSourceList(sourceList.filter((s) => !selectedSources.includes(s.source_id)));
       setSelectedSources([]);
       alert("Sources deleted");
-    } catch {
-      alert("Error deleting sources");
+    } catch (err) {
+      alert("Error deleting sources: " + err.message);
     }
   };
 
@@ -62,7 +60,7 @@ function Source() {
     }
 
     try {
-      await axios.put("http://localhost:8080/api/sources/updateSource", {
+      await sourcesAPI.updateSource({
         source_id: id,
         newName: editForm.name,
         newPhone: editForm.phone,
@@ -76,8 +74,8 @@ function Source() {
       );
       setEditingSource(null);
       alert("Source updated");
-    } catch {
-      alert("Error updating source");
+    } catch (err) {
+      alert("Error updating source: " + err.message);
     }
   };
 

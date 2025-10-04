@@ -1,7 +1,7 @@
 // src/EditPrice.jsx
 import { useState, useEffect, useMemo } from "react";
-import axios from "axios";
 import BarcodeScannerComponent from "react-qr-barcode-scanner";
+import { productsAPI, sourcesAPI } from "./api";
 import "./App.css";
 
 function EditPrice() {
@@ -27,29 +27,29 @@ function EditPrice() {
 
   const fetchProducts = async () => {
     try {
-      const res = await axios.get("http://localhost:8080/api/products/list");
-      setProducts(res.data.products || []);
+      const data = await productsAPI.listAll();
+      setProducts(data.products || []);
       setSelectedProducts([]); // clear selection by default
-    } catch {
-      alert("Error fetching products");
+    } catch (err) {
+      alert("Error fetching products: " + err.message);
     }
   };
 
   const fetchSources = async () => {
     try {
-      const res = await axios.get("http://localhost:8080/api/sources/list");
-      setSourceList(res.data.sources || []);
-    } catch {
-      alert("Error fetching sources");
+      const data = await sourcesAPI.listAll();
+      setSourceList(data.sources || []);
+    } catch (err) {
+      alert("Error fetching sources: " + err.message);
     }
   };
 
   const fetchCategories = async () => {
     try {
-      const res = await axios.get("http://localhost:8080/api/products/categories");
-      setCategoryList(res.data.categories || []);
-    } catch {
-      alert("Error fetching categories");
+      const data = await productsAPI.getCategories();
+      setCategoryList(data.categories || []);
+    } catch (err) {
+      alert("Error fetching categories: " + err.message);
     }
   };
 
@@ -98,10 +98,7 @@ function EditPrice() {
       product_ids: productsToUpdate,
       changes: { price: Number(priceValue), type: priceType },
     };
-    await axios.put(
-      "http://localhost:8080/api/products/updateSelected",
-      payload
-    );
+    await productsAPI.updateSelectedProducts(payload);
 
     setAlertMsg("✅ Prices updated successfully!");
     fetchProducts();
@@ -279,15 +276,12 @@ function EditPrice() {
             onUpdate={async (err, result) => {
               if (result) {
                 try {
-                  const res = await axios.get(
-                    "http://localhost:8080/api/products/findByBarcode",
-                    { params: { barcode: result.text } }
-                  );
-                  setProducts([res.data.product]);
+                  const data = await productsAPI.findByBarcode(result.text);
+                  setProducts([data.product]);
                   setSelectedProducts([]);
                   setScanBarcode(false);
-                } catch {
-                  alert("Product not found");
+                } catch (err) {
+                  alert("Product not found: " + err.message);
                 }
               }
             }}

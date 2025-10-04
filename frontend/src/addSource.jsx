@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import axios from "axios";
+import { sourcesAPI } from "./api";
 import "./App.css";
 
 function AddSource({ onSourceAdded }) {
@@ -22,13 +22,13 @@ function AddSource({ onSourceAdded }) {
 
     setLoading(true);
     try {
-      const res = await axios.post("http://localhost:8080/api/sources/addSource", newSource);
-      alert(res.data.message);
-      onSourceAdded({ source_id: res.data.source_id, ...newSource });
+      const data = await sourcesAPI.addSource(newSource);
+      alert(data.message);
+      onSourceAdded({ source_id: data.source_id, ...newSource });
       setNewSource({ name: "", phone: "", address: "" });
     } catch (err) {
       console.error(err);
-      alert(err.response?.data?.error || "Error adding source");
+      alert(err.message || "Error adding source");
     } finally {
       setLoading(false);
     }

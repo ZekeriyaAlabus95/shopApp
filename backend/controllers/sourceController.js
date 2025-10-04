@@ -3,7 +3,12 @@
 // GET /list - fetch all sources
 exports.listAll = async (c) => {
     try {
-        const result = await c.env.DB.prepare("SELECT * FROM source").all();
+        const userId = c.req.header('X-User-ID');
+        if (!userId) {
+            return c.json({ error: "User ID required" }, 400);
+        }
+
+        const result = await c.env.DB.prepare("SELECT * FROM source WHERE user_id = ?").bind(userId).all();
         const rows = result.results || [];
         return c.json({ sources: rows });
     } catch (err) {
@@ -18,6 +23,11 @@ exports.listAll = async (c) => {
 // POST /addSource - add a new source
 exports.addSource = async (c) => {
     try {
+        const userId = c.req.header('X-User-ID');
+        if (!userId) {
+            return c.json({ error: "User ID required" }, 400);
+        }
+
         const { name, phone, address } = await c.req.json();
 
         // --- Validation ---
@@ -30,8 +40,8 @@ exports.addSource = async (c) => {
         }
 
         await c.env.DB.prepare(
-            "INSERT INTO source (name, phone, address) VALUES (?, ?, ?)"
-        ).bind(name, phone, address).run();
+            "INSERT INTO source (name, phone, address, user_id) VALUES (?, ?, ?, ?)"
+        ).bind(name, phone, address, userId).run();
         const idRes = await c.env.DB.prepare("SELECT last_insert_rowid() as id").all();
         const sourceId = idRes.results && idRes.results[0] && idRes.results[0].id;
 
@@ -50,10 +60,15 @@ exports.addSource = async (c) => {
 // PUT /updateSource - update a source by ID
 exports.updateSource = async (c) => {
     try {
+        const userId = c.req.header('X-User-ID');
+        if (!userId) {
+            return c.json({ error: "User ID required" }, 400);
+        }
+
         const { source_id, newName, newPhone, newAddress } = await c.req.json();
         await c.env.DB.prepare(
-            "UPDATE source SET name = ?, phone = ?, address = ? WHERE source_id = ?"
-        ).bind(newName, newPhone, newAddress, source_id).run();
+            "UPDATE source SET name = ?, phone = ?, address = ? WHERE source_id = ? AND user_id = ?"
+        ).bind(newName, newPhone, newAddress, source_id, userId).run();
         return c.json({
             message: `Source ${source_id} updated successfully`,
             updated: { newName, newPhone, newAddress }
@@ -66,6 +81,11 @@ exports.updateSource = async (c) => {
 
 exports.deleteSource = async (c) => {
   try {
+    const userId = c.req.header('X-User-ID');
+    if (!userId) {
+      return c.json({ error: "User ID required" }, 400);
+    }
+
     const { source_ids } = await c.req.json();
     if (!Array.isArray(source_ids) || source_ids.length === 0) {
       return c.json({ error: "No source IDs provided" }, 400);
@@ -73,8 +93,8 @@ exports.deleteSource = async (c) => {
 
     const placeholders = source_ids.map(() => "?").join(",");
     await c.env.DB.prepare(
-      `DELETE FROM source WHERE source_id IN (${placeholders})`
-    ).bind(...source_ids).run();
+      `DELETE FROM source WHERE source_id IN (${placeholders}) AND user_id = ?`
+    ).bind(...source_ids, userId).run();
 
     return c.json({ message: `${source_ids.length} source(s) deleted successfully` });
   } catch (err) {

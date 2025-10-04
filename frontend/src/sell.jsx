@@ -1,6 +1,6 @@
 import { useRef, useState } from "react";
-import axios from "axios";
 import BarcodeScannerComponent from "react-qr-barcode-scanner";
+import { productsAPI } from "./api";
 import "./App.css";
 
 function Sell() {
@@ -17,12 +17,10 @@ function Sell() {
     if (!code) return;
 
     try {
-      const res = await axios.get(`http://localhost:8080/api/products/findByBarcode`, {
-        params: { barcode: code }
-      });
+      const data = await productsAPI.findByBarcode(code);
 
-      if (res.data.product) {
-        const price = Number(res.data.product.price);
+      if (data.product) {
+        const price = Number(data.product.price);
 
         setSoldProducts((prev) => {
           const existing = prev.find((p) => p.barcode === code);
@@ -81,19 +79,19 @@ function Sell() {
     }
 
     try {
-      const res = await axios.post("http://localhost:8080/api/products/sell", {
-        items: soldProducts.map((p) => ({
+      const data = await productsAPI.sellProduct(
+        soldProducts.map((p) => ({
           product_id: p.product_id,
           quantity: p.quantity
         }))
-      });
+      );
 
-      const txId = res.data?.transaction_id;
-      const total = res.data?.total_amount;
+      const txId = data?.transaction_id;
+      const total = data?.total_amount;
       if (txId) {
         alert(`Sale recorded. Transaction #${txId} | Total: $${Number(total).toFixed(2)}`);
       } else {
-        alert(res.data.message || "Products sold successfully");
+        alert(data.message || "Products sold successfully");
       }
 
       // Clear sold products list

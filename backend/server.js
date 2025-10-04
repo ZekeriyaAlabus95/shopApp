@@ -4,6 +4,7 @@ const { cors } = require("hono/cors");
 // Controllers (Hono handlers)
 const products = require("./controllers/productController");
 const sources = require("./controllers/sourceController");
+const auth = require("./controllers/authController");
 
 const app = new Hono();
 
@@ -34,6 +35,11 @@ app.get("/api/sources/list", sources.listAll);
 app.post("/api/sources/addSource", sources.addSource);
 app.put("/api/sources/updateSource", sources.updateSource);
 app.delete("/api/sources/deleteSource", sources.deleteSource);
+
+// Authentication routes
+app.post("/api/auth/register", auth.register);
+app.post("/api/auth/login", auth.login);
+app.get("/api/auth/verify", auth.verify);
 
 // Health check
 app.get("/health", (c) => c.json({ ok: true }));

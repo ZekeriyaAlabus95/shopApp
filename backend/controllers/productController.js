@@ -3,9 +3,14 @@
 // GET /list - fetch all products
 exports.listAll = async (c) => {
   try {
+    const userId = c.req.header('X-User-ID');
+    if (!userId) {
+      return c.json({ error: "User ID required" }, 400);
+    }
+
     const result = await c.env.DB.prepare(
-      "SELECT p.*, s.name FROM product p JOIN source s ON p.source_id = s.source_id WHERE quantity > 0"
-    ).all();
+      "SELECT p.*, s.name FROM product p JOIN source s ON p.source_id = s.source_id WHERE p.quantity > 0 AND p.user_id = ?"
+    ).bind(userId).all();
 
     const rows = result.results || [];
 
@@ -36,6 +41,11 @@ exports.listAll = async (c) => {
 // POST /addProduct - add a new product
 exports.addProduct = async (c) => {
   try {
+    const userId = c.req.header('X-User-ID');
+    if (!userId) {
+      return c.json({ error: "User ID required" }, 400);
+    }
+
     const body = await c.req.json();
     const { barcode, price, product_name, quantity, source_id, category } = body;
 
@@ -54,10 +64,10 @@ exports.addProduct = async (c) => {
     try {
       await c.env.DB.prepare(
         `INSERT INTO product 
-          (barcode, price, date_accepted, product_name, quantity, source_id, category) 
-         VALUES (?, ?, ?, ?, ?, ?, ?)`
+          (barcode, price, date_accepted, product_name, quantity, source_id, category, user_id) 
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
       )
-        .bind(barcode, price, today, product_name, quantity, source_id, category)
+        .bind(barcode, price, today, product_name, quantity, source_id, category, userId)
         .run();
     } catch (err) {
       if (/UNIQUE constraint failed|SQLITE_CONSTRAINT/i.test(err.message || "")) {
@@ -77,6 +87,11 @@ exports.addProduct = async (c) => {
 // PUT /update - update a product by ID
 exports.updateProduct = async (c) => {
   try {
+    const userId = c.req.header('X-User-ID');
+    if (!userId) {
+      return c.json({ error: "User ID required" }, 400);
+    }
+
     const { product_id, barcode, price, product_name, quantity, source_id } =
       await c.req.json();
 
@@ -102,8 +117,8 @@ exports.updateProduct = async (c) => {
     }
 
     await c.env.DB.prepare(
-      "UPDATE product SET barcode = ?, price = ?, product_name = ?, quantity = ?, source_id = ? WHERE product_id = ?"
-    ).bind(barcode, price, product_name, quantity, source_id, product_id).run();
+      "UPDATE product SET barcode = ?, price = ?, product_name = ?, quantity = ?, source_id = ? WHERE product_id = ? AND user_id = ?"
+    ).bind(barcode, price, product_name, quantity, source_id, product_id, userId).run();
 
     return c.json({
       message: `Product ${product_id} updated successfully`,
@@ -210,11 +225,16 @@ exports.deleteProduct = async (c) => {
 };
 exports.findByBarcode = async (c) => {
   try {
+    const userId = c.req.header('X-User-ID');
+    if (!userId) {
+      return c.json({ error: "User ID required" }, 400);
+    }
+
     const barcode = c.req.query("barcode");
 
     const result = await c.env.DB.prepare(
-      "SELECT p.*, s.name as source_name FROM product p JOIN source s ON p.source_id = s.source_id WHERE barcode = ?"
-    ).bind(barcode).all();
+      "SELECT p.*, s.name as source_name FROM product p JOIN source s ON p.source_id = s.source_id WHERE p.barcode = ? AND p.user_id = ?"
+    ).bind(barcode, userId).all();
     const rows = result.results || [];
 
     if (rows.length === 0) {
@@ -231,6 +251,11 @@ exports.findByBarcode = async (c) => {
 // POST /sell - sell products and record transaction
 exports.sellProduct = async (c) => {
   try {
+    const userId = c.req.header('X-User-ID');
+    if (!userId) {
+      return c.json({ error: "User ID required" }, 400);
+    }
+
     const { items } = await c.req.json();
     // items = [{ product_id: number, quantity: number }]
 
@@ -247,8 +272,8 @@ exports.sellProduct = async (c) => {
 
       for (const item of items) {
         const res1 = await c.env.DB.prepare(
-          "SELECT product_id, price, quantity FROM product WHERE product_id = ?"
-        ).bind(item.product_id).all();
+          "SELECT product_id, price, quantity FROM product WHERE product_id = ? AND user_id = ?"
+        ).bind(item.product_id, userId).all();
         const rows = res1.results || [];
 
         if (!rows || rows.length === 0) {
@@ -275,8 +300,8 @@ exports.sellProduct = async (c) => {
 
       // Insert transaction
       await c.env.DB.prepare(
-        "INSERT INTO `transaction` (total_amount) VALUES (?)"
-      ).bind(Number(totalAmount.toFixed(2))).run();
+        "INSERT INTO transactions (user_id, total_amount) VALUES (?, ?)"
+      ).bind(userId, Number(totalAmount.toFixed(2))).run();
       // Get last inserted id in SQLite
       const txIdRes = await c.env.DB.prepare("SELECT last_insert_rowid() as id").all();
       const transactionId = txIdRes.results && txIdRes.results[0] && txIdRes.results[0].id;
@@ -284,12 +309,12 @@ exports.sellProduct = async (c) => {
       // Insert items and decrement stock
       for (const it of itemsWithPrice) {
         await c.env.DB.prepare(
-          "INSERT INTO transaction_item (transaction_id, product_id, quantity, price) VALUES (?, ?, ?, ?)"
-        ).bind(transactionId, it.product_id, it.quantity, Number(it.price.toFixed(2))).run();
+          "INSERT INTO transaction_item (transaction_id, product_id, user_id, quantity, price) VALUES (?, ?, ?, ?, ?)"
+        ).bind(transactionId, it.product_id, userId, it.quantity, Number(it.price.toFixed(2))).run();
 
         await c.env.DB.prepare(
-          "UPDATE product SET quantity = quantity - ? WHERE product_id = ?"
-        ).bind(it.quantity, it.product_id).run();
+          "UPDATE product SET quantity = quantity - ? WHERE product_id = ? AND user_id = ?"
+        ).bind(it.quantity, it.product_id, userId).run();
       }
 
       await c.env.DB.prepare("COMMIT").run();
@@ -307,21 +332,27 @@ exports.sellProduct = async (c) => {
 
 exports.addOrIncrease = async (c) => {
   try {
+    const userId = c.req.header('X-User-ID');
+    if (!userId) {
+      return c.json({ error: "User ID required" }, 400);
+    }
+
     const { barcode, price, product_name, quantity, source_id, category } =
       await c.req.json();
 
     // Check if product already exists
     const existing = await c.env.DB.prepare(
-      "SELECT product_id, quantity FROM product WHERE barcode = ?"
-    ).bind(barcode).all();
+      "SELECT product_id, quantity FROM product WHERE barcode = ? AND user_id = ?"
+    ).bind(barcode, userId).all();
     const existingRows = existing.results || [];
 
     if (existingRows.length > 0) {
       // Increase quantity
       const newQty = Number(existingRows[0].quantity) + Number(quantity);
-      await c.env.DB.prepare("UPDATE product SET quantity = ? WHERE product_id = ?").bind(
+      await c.env.DB.prepare("UPDATE product SET quantity = ? WHERE product_id = ? AND user_id = ?").bind(
         newQty,
         existingRows[0].product_id,
+        userId
       ).run();
       return c.json({
         message: `✅ Product exists. Quantity increased by ${quantity}`,
@@ -330,9 +361,9 @@ exports.addOrIncrease = async (c) => {
 
     // Insert new product
     await c.env.DB.prepare(
-      `INSERT INTO product (barcode, price, date_accepted, product_name, quantity, source_id, category)
-       VALUES (?, ?, DATE('now'), ?, ?, ?, ?)`
-    ).bind(barcode, price, product_name, quantity, source_id, category).run();
+      `INSERT INTO product (barcode, price, date_accepted, product_name, quantity, source_id, category, user_id)
+       VALUES (?, ?, DATE('now'), ?, ?, ?, ?, ?)`
+    ).bind(barcode, price, product_name, quantity, source_id, category, userId).run();
 
     return c.json({ message: "✅ Product added successfully" });
   } catch (err) {
@@ -343,7 +374,12 @@ exports.addOrIncrease = async (c) => {
 // GET /products/categories - fetch all unique categories
 exports.getCategories = async (c) => {
   try {
-    const result = await c.env.DB.prepare("SELECT DISTINCT category FROM product WHERE category IS NOT NULL").all();
+    const userId = c.req.header('X-User-ID');
+    if (!userId) {
+      return c.json({ error: "User ID required" }, 400);
+    }
+
+    const result = await c.env.DB.prepare("SELECT DISTINCT category FROM product WHERE category IS NOT NULL AND user_id = ?").bind(userId).all();
     const rows = result.results || [];
     const categories = rows.map(r => r.category);
     return c.json({ categories });

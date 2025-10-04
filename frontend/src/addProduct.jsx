@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
-import axios from "axios";
 import BarcodeScannerComponent from "react-qr-barcode-scanner";
+import { productsAPI, sourcesAPI } from "./api";
 import "./App.css";
 
 function AddProduct({ onProductAdded }) {
@@ -21,22 +21,20 @@ function AddProduct({ onProductAdded }) {
 
   const fetchSources = async () => {
     try {
-      const res = await axios.get("http://localhost:8080/api/sources/list");
-      setSourceList(res.data.sources || []);
+      const data = await sourcesAPI.listAll();
+      setSourceList(data.sources || []);
     } catch (err) {
-      alert("Error fetching sources");
+      alert("Error fetching sources: " + err.message);
     }
   };
 
   const fetchProductByBarcode = async (barcode) => {
     if (!barcode) return;
     try {
-      const res = await axios.get(`http://localhost:8080/api/products/findByBarcode`, {
-        params: { barcode },
-      });
+      const data = await productsAPI.findByBarcode(barcode);
 
-      if (res.data.product) {
-        const product = res.data.product;
+      if (data.product) {
+        const product = data.product;
         setNewProduct((prev) => ({
           ...prev,
           name: product.product_name,
@@ -58,7 +56,7 @@ function AddProduct({ onProductAdded }) {
     }
 
     try {
-      await axios.post("http://localhost:8080/api/products/addOrIncrease", {
+      await productsAPI.addOrIncrease({
         barcode,
         product_name: name,
         price,
