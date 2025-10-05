@@ -4,6 +4,7 @@ import { productsAPI, sourcesAPI } from "./api";
 import "./App.css";
 import Sell from "./sell";
 import AddProduct from "./addProduct";
+import Transactions from "./transactions";
 
 function Product() {
   const [products, setProducts] = useState([]);
@@ -174,6 +175,8 @@ function Product() {
         return <Sell onSaleComplete={fetchProducts} />;
       case "add":
         return <AddProduct onProductAdded={fetchProducts} />;
+      case "transactions":
+        return <Transactions onTransactionsComplete={fetchProducts} />;
       case "list":
         return (
           <>
@@ -493,7 +496,7 @@ function Product() {
       <div className="panel-header">
         <h2>Products Dashboard</h2>
         <div className="tabs">
-          {["sell", "add", "list"].map((tab) => (
+          {["sell", "add", "list", "transactions"].map((tab) => (
             <button
               key={tab}
               className={activeTab === tab ? "tab active" : "tab"}

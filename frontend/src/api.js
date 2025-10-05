@@ -1,6 +1,6 @@
 // API utility functions with user authentication
 
-const API_BASE_URL = 'http://localhost:8787'; // Adjust this to your backend URL
+const API_BASE_URL = 'https://shop.zakariyaalabous.vip'; // Adjust this to your backend URL
 
 // Get user from localStorage
 const getCurrentUser = () => {
