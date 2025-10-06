@@ -5,6 +5,7 @@ const { cors } = require("hono/cors");
 const products = require("./controllers/productController");
 const sources = require("./controllers/sourceController");
 const auth = require("./controllers/authController");
+const transactions = require("./controllers/transactionController");
 
 const app = new Hono();
 
@@ -29,6 +30,12 @@ app.put("/api/products/updateBySource", products.updateBySource);
 app.put("/api/products/updateSelected", products.updateSelectedProducts);
 app.post("/api/products/sell", products.sellProduct);
 app.get("/api/products/categories", products.getCategories);
+
+// Transactions routes
+app.get("/api/transactions/list", transactions.listAll);
+app.get("/api/transactions/items", transactions.getItems);
+app.post("/api/transactions/add", transactions.add);
+app.delete("/api/transactions/delete", transactions.deleteMany);
 
 // Source routes
 app.get("/api/sources/list", sources.listAll);
