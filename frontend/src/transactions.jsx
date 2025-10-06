@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo } from "react";
 import { transactionsAPI, productsAPI, sourcesAPI } from "./api";
 import "./App.css";
 
+
 function Transaction() {
   const [transactions, setTransactions] = useState([]);
   const [products, setProducts] = useState([]);

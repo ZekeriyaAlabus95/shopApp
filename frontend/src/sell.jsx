@@ -32,13 +32,15 @@ function Sell() {
                 : p
             );
           } else {
-            const prod = { ...res.data.product, quantity: 1, total: price };
+            // Use fetched product data; ensure numeric price and total
+            const prod = { ...data.product, price, quantity: 1, total: price };
             updated = [...prev, prod];
           }
 
           // Play sound effect when product is added
           addProductSFX.currentTime = 0;
-          addProductSFX.play();
+          // Audio play can fail if user hasn't interacted yet; ignore errors
+          addProductSFX.play().catch(() => {});
 
           return updated;
         });
@@ -98,11 +100,8 @@ function Sell() {
       setSoldProducts([]);
       setBarcodeInput("");
     } catch (err) {
-      if (err.response?.data?.error) {
-        alert(err.response.data.error);
-      } else {
-        alert("Error selling products");
-      }
+      const msg = (err && err.message) || (err && err.error) || "Error selling products";
+      alert(msg);
     }
   };
 

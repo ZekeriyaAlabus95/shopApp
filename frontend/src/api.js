@@ -141,3 +141,22 @@ export const sourcesAPI = {
       body: JSON.stringify({ source_ids: sourceIds })
     })
 };
+
+// Transactions API calls
+export const transactionsAPI = {
+  listAll: () => apiCall('/api/transactions/list'),
+
+  addTransaction: (transactionData) =>
+    apiCall('/api/transactions/add', {
+      method: 'POST',
+      body: JSON.stringify(transactionData)
+    }),
+
+  deleteTransaction: (transactionId) =>
+    apiCall(`/api/transactions/delete/${transactionId}`, {
+      method: 'DELETE'
+    }),
+
+  getByUser: (userId) =>
+    apiCall(`/api/transactions/byUser/${userId}`)
+};
