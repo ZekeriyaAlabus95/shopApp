@@ -14,20 +14,21 @@ function Sell() {
 
   // Fetch product by barcode
   const fetchProductByBarcode = async (code) => {
-    if (!code) return;
+    const cleaned = (code || "").trim();
+    if (!cleaned) return;
 
     try {
-      const data = await productsAPI.findByBarcode(code);
+      const data = await productsAPI.findByBarcode(cleaned);
 
       if (data.product) {
         const price = Number(data.product.price);
 
         setSoldProducts((prev) => {
-          const existing = prev.find((p) => p.barcode === code);
+          const existing = prev.find((p) => p.barcode === cleaned);
           let updated;
           if (existing) {
             updated = prev.map((p) =>
-              p.barcode === code
+              p.barcode === cleaned
                 ? { ...p, quantity: p.quantity + 1, total: (p.quantity + 1) * price }
                 : p
             );
@@ -48,7 +49,8 @@ function Sell() {
         alert("Product not found");
       }
     } catch (err) {
-      alert("Error fetching product");
+      const msg = (err && err.message) || (err && err.error) || "Error fetching product";
+      alert(msg);
     }
   };
 
