@@ -349,112 +349,104 @@ exports.sellProduct = async (c) => {
   }
 };
 
-
 exports.addOrIncrease = async (c) => {
   try {
     const userId = c.req.header("X-User-ID");
-    if (!userId) {
-      return c.json({ error: "User ID required" }, 400);
-    }
+    if (!userId) return c.json({ error: "User ID required" }, 400);
 
     const { barcode, price, product_name, quantity, source_id, category } =
       await c.req.json();
 
     const qty = Number(quantity);
     const unitPrice = Number(price);
-    const totalAmount = Number((qty * unitPrice).toFixed(2));
+    const totalAmount = qty * unitPrice;
 
-    let transactionId = null;
+    // Check if product exists
+    const existing = await c.env.DB.prepare(
+      "SELECT product_id, quantity FROM product WHERE barcode = ? AND user_id = ?"
+    )
+      .bind(barcode, userId)
+      .all();
 
-    // -----------------------------
-    // 🚀 Run everything atomically
-    // -----------------------------
-    await c.env.DB.transaction(async (txn) => {
-      // Check if product exists
-      const existing = await txn
-        .prepare(
-          "SELECT product_id, quantity FROM product WHERE barcode = ? AND user_id = ?"
-        )
-        .bind(barcode, userId)
-        .all();
+    const exists = existing.results?.length > 0;
 
-      const rows = existing.results || [];
-      let productId;
+    let productId;
+    const batch = [];
 
-      if (rows.length > 0) {
-        // ---- Update existing product ----
-        const newQty = Number(rows[0].quantity) + qty;
-        productId = rows[0].product_id;
+    if (exists) {
+      // Update existing
+      const newQty = Number(existing.results[0].quantity) + qty;
+      productId = existing.results[0].product_id;
 
-        await txn
+      batch.push(
+        c.env.DB
           .prepare(
             "UPDATE product SET quantity = ?, price = ? WHERE product_id = ? AND user_id = ?"
           )
           .bind(newQty, unitPrice, productId, userId)
-          .run();
-      } else {
-        // ---- Insert new product ----
-        await txn
+      );
+    } else {
+      // Insert new product
+      batch.push(
+        c.env.DB
           .prepare(
             `INSERT INTO product (barcode, price, date_accepted, product_name, quantity, source_id, category, user_id)
              VALUES (?, ?, DATE('now'), ?, ?, ?, ?, ?)`
           )
-          .bind(
-            barcode,
-            unitPrice,
-            product_name,
-            qty,
-            source_id,
-            category,
-            userId
-          )
-          .run();
+          .bind(barcode, unitPrice, product_name, qty, source_id, category, userId)
+      );
 
-        const idRes = await txn
-          .prepare("SELECT last_insert_rowid() AS id")
-          .all();
+      // fetch last id
+      const lastId = await c.env.DB.prepare(
+        "SELECT last_insert_rowid() AS id"
+      ).all();
+      productId = lastId.results?.[0]?.id;
+    }
 
-        productId = idRes.results?.[0]?.id;
-      }
-
-      // ---- Create buy transaction ----
-      await txn
+    // Insert buy transaction
+    batch.push(
+      c.env.DB
         .prepare(
           `INSERT INTO transactions (user_id, source_id, total_amount, type)
            VALUES (?, ?, ?, 'buy')`
         )
         .bind(userId, source_id, totalAmount)
-        .run();
+    );
 
-      const txRes = await txn
-        .prepare("SELECT last_insert_rowid() AS id")
-        .all();
+    // Get transaction ID
+    const lastTx = await c.env.DB.prepare(
+      "SELECT last_insert_rowid() AS id"
+    ).all();
+    const transactionId = lastTx.results?.[0]?.id;
 
-      transactionId = txRes.results?.[0]?.id;
-
-      // ---- Add transaction item ----
-      await txn
+    // Insert transaction item
+    batch.push(
+      c.env.DB
         .prepare(
           `INSERT INTO transaction_item (transaction_id, product_id, user_id, quantity, price)
            VALUES (?, ?, ?, ?, ?)`
         )
         .bind(transactionId, productId, userId, qty, unitPrice)
-        .run();
-    });
+    );
+
+    // Run everything atomically
+    await c.env.DB.batch(batch);
 
     return c.json({
-      message:
-        transactionId !== null
-          ? "✅ Product added / updated and transaction recorded"
-          : "❌ Transaction error",
+      message: exists
+        ? "✅ Quantity increased and transaction saved"
+        : "✅ Product added and transaction saved",
       transaction_id: transactionId,
       total_amount: totalAmount,
     });
+
   } catch (err) {
     console.error(err);
     return c.json({ error: "❌ Database error" }, 500);
   }
 };
+
+
 // GET /products/categories - fetch all unique categories
 exports.getCategories = async (c) => {
   try {
