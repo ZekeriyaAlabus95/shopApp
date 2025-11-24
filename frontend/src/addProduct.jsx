@@ -49,40 +49,49 @@ function AddProduct({ onProductAdded }) {
   };
 
   const handleAddProduct = async () => {
-    const { barcode, name, price, category, quantity, source_id } = newProduct;
-    if (!barcode || !name || !price || !source_id) {
-      alert("Barcode, Name, Price, and Source are required");
-      return;
-    }
+  const { barcode, name, price, category, quantity, source_id } = newProduct;
+  
+  if (!barcode || !name || !price || !source_id) {
+    alert("Barcode, Name, Price, and Source are required");
+    return;
+  }
 
-    try {
-      await productsAPI.addOrIncrease({
-        barcode,
-        product_name: name,
-        price,
-        category,
-        quantity,
-        source_id,
-      });
+  try {
+    // Wrap the single product in an array
+    await productsAPI.addOrIncrease({
+      items: [
+        {
+          barcode,
+          product_name: name,
+          price: Number(price),
+          category,
+          quantity: Number(quantity),
+          source_id: Number(source_id),
+        },
+      ],
+    });
 
-      alert("Product added or quantity increased successfully");
+    alert("Product added or quantity increased successfully");
 
-      setNewProduct({
-        barcode: "",
-        name: "",
-        price: "",
-        category: "",
-        quantity: 1,
-        source_id: "",
-      });
-      setScanBarcode(false);
+    // Reset the form
+    setNewProduct({
+      barcode: "",
+      name: "",
+      price: "",
+      category: "",
+      quantity: 1,
+      source_id: "",
+    });
+    setScanBarcode(false);
 
-      if (onProductAdded) onProductAdded();
-    } catch (err) {
-      if (err.response?.data?.error) alert(err.response.data.error);
-      else alert("Error adding product");
-    }
-  };
+    // Optional callback
+    if (onProductAdded) onProductAdded();
+  } catch (err) {
+    if (err.response?.data?.error) alert(err.response.data.error);
+    else alert("Error adding product");
+  }
+};
+
 
   return (
     <section className="panel">

@@ -349,102 +349,144 @@ exports.sellProduct = async (c) => {
   }
 };
 
+
+
 exports.addOrIncrease = async (c) => {
   try {
     const userId = c.req.header("X-User-ID");
     if (!userId) return c.json({ error: "User ID required" }, 400);
 
-    const { barcode, price, product_name, quantity, source_id, category } =
-      await c.req.json();
-
-    const qty = Number(quantity);
-    const unitPrice = Number(price);
-    const totalAmount = qty * unitPrice;
-
-    // Check if product exists
-    const existing = await c.env.DB.prepare(
-      "SELECT product_id, quantity FROM product WHERE barcode = ? AND user_id = ?"
-    )
-      .bind(barcode, userId)
-      .all();
-
-    const exists = existing.results?.length > 0;
-
-    let productId;
-    const batch = [];
-
-    if (exists) {
-      // Update existing
-      const newQty = Number(existing.results[0].quantity) + qty;
-      productId = existing.results[0].product_id;
-
-      batch.push(
-        c.env.DB
-          .prepare(
-            "UPDATE product SET quantity = ?, price = ? WHERE product_id = ? AND user_id = ?"
-          )
-          .bind(newQty, unitPrice, productId, userId)
-      );
-    } else {
-      // Insert new product
-      batch.push(
-        c.env.DB
-          .prepare(
-            `INSERT INTO product (barcode, price, date_accepted, product_name, quantity, source_id, category, user_id)
-             VALUES (?, ?, DATE('now'), ?, ?, ?, ?, ?)`
-          )
-          .bind(barcode, unitPrice, product_name, qty, source_id, category, userId)
-      );
-
-      // fetch last id
-      const lastId = await c.env.DB.prepare(
-        "SELECT last_insert_rowid() AS id"
-      ).all();
-      productId = lastId.results?.[0]?.id;
+    const { items } = await c.req.json();
+    if (!Array.isArray(items) || items.length === 0) {
+      return c.json({ error: "Items are required" }, 400);
     }
 
-    // Insert buy transaction
+    let totalAmount = 0;
+    const batch = [];
+    const transactionItems = [];
+
+    // PROCESS ALL ITEMS
+    for (const item of items) {
+      const {
+        barcode,
+        price,
+        product_name,
+        quantity,
+        source_id,
+        category,
+      } = item;
+
+      const qty = Number(quantity);
+      const unitPrice = Number(price);
+
+      if (!barcode || !qty || qty <= 0 || !unitPrice) {
+        throw new Error("Invalid product data");
+      }
+
+      totalAmount += qty * unitPrice;
+
+      // Check if product exists
+      const existing = await c.env.DB.prepare(
+        "SELECT product_id, quantity FROM product WHERE barcode = ? AND user_id = ?"
+      )
+        .bind(barcode, userId)
+        .all();
+
+      const exists = existing.results?.length > 0;
+      let productId;
+
+      if (exists) {
+        // Product already exists → update quantity and price
+        const newQty = Number(existing.results[0].quantity) + qty;
+        productId = existing.results[0].product_id;
+
+        batch.push(
+          c.env.DB
+            .prepare(
+              "UPDATE product SET quantity = ?, price = ? WHERE product_id = ? AND user_id = ?"
+            )
+            .bind(newQty, unitPrice, productId, userId)
+        );
+      } else {
+        // Insert new product
+        batch.push(
+          c.env.DB.prepare(
+            `INSERT INTO product (barcode, price, date_accepted, product_name, quantity, source_id, category, user_id)
+             VALUES (?, ?, DATE('now'), ?, ?, ?, ?, ?)`
+          ).bind(
+            barcode,
+            unitPrice,
+            product_name,
+            qty,
+            source_id,
+            category,
+            userId
+          )
+        );
+
+        // Fetch new product id
+        const lastId = await c.env.DB.prepare(
+          "SELECT last_insert_rowid() AS id"
+        ).all();
+
+        productId = lastId.results?.[0]?.id;
+      }
+
+      // Store for later insertion into transaction_item
+      transactionItems.push({
+        product_id: productId,
+        qty,
+        unitPrice,
+        source_id,
+      });
+    }
+
+    // INSERT TRANSACTION (type: bought)
     batch.push(
-      c.env.DB
-        .prepare(
-          `INSERT INTO transactions (user_id, source_id, total_amount, type)
-           VALUES (?, ?, ?, 'buy')`
-        )
-        .bind(userId, source_id, totalAmount)
+      c.env.DB.prepare(
+        `INSERT INTO transactions (user_id, source_id, total_amount, type)
+         VALUES (?, ?, ?, 'bought')`
+      ).bind(userId, transactionItems[0].source_id, totalAmount)
     );
 
-    // Get transaction ID
+    // Get new transaction id
     const lastTx = await c.env.DB.prepare(
       "SELECT last_insert_rowid() AS id"
     ).all();
     const transactionId = lastTx.results?.[0]?.id;
 
-    // Insert transaction item
-    batch.push(
-      c.env.DB
-        .prepare(
+    // INSERT ALL TRANSACTION ITEMS
+    for (const ti of transactionItems) {
+      batch.push(
+        c.env.DB.prepare(
           `INSERT INTO transaction_item (transaction_id, product_id, user_id, quantity, price)
            VALUES (?, ?, ?, ?, ?)`
+        ).bind(
+          transactionId,
+          ti.product_id,
+          userId,
+          ti.qty,
+          ti.unitPrice
         )
-        .bind(transactionId, productId, userId, qty, unitPrice)
-    );
+      );
+    }
 
-    // Run everything atomically
+    // Execute atomic batch
     await c.env.DB.batch(batch);
 
     return c.json({
-      message: exists
-        ? "✅ Quantity increased and transaction saved"
-        : "✅ Product added and transaction saved",
+      message: "✅ Products updated and bought transaction recorded",
       transaction_id: transactionId,
-      total_amount: totalAmount,
+      total_amount: Number(totalAmount.toFixed(2)),
+      items_count: items.length,
     });
 
   } catch (err) {
     console.error(err);
-    return c.json({ error: "❌ Database error" }, 500);
+    return c.json({ error: err.message || "❌ Database error" }, 500);
   }
 };
+
 
 
 // GET /products/categories - fetch all unique categories
