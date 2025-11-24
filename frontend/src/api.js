@@ -157,6 +157,12 @@ export const transactionsAPI = {
       method: "POST",
       body: JSON.stringify(data),
     }),
+    
+
+getItems: (transaction_id) =>
+    apiCall(`/api/transactions/items?transaction_id=${transaction_id}`, {
+      method: "GET",
+    }),
 
   getTransactionItems: (id) =>
     apiCall(`/api/transactions/items?transaction_id=${id}`),

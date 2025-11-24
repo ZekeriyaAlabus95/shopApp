@@ -12,6 +12,8 @@ function Transaction() {
   const [sourceFilter, setSourceFilter] = useState("all");
   const [typeFilter, setTypeFilter] = useState("all");
   const [sortBy, setSortBy] = useState("none");
+  const [selectedTransactionItems, setSelectedTransactionItems] = useState([]);
+  const [selectedTransactionInfo, setSelectedTransactionInfo] = useState(null);
 
   useEffect(() => {
     fetchTransactions();
@@ -28,7 +30,16 @@ function Transaction() {
       alert("Error fetching transactions: " + err.message);
     }
   };
-
+  const fetchTransactionItems = async (transactionId) => {
+    try {
+      const data = await transactionsAPI.getItems(transactionId);
+      setSelectedTransactionItems(data.items || []);
+      const t = transactions.find((x) => x.transaction_id === transactionId);
+      setSelectedTransactionInfo(t);
+    } catch (err) {
+      alert("Error fetching transaction details: " + err.message);
+    }
+  };
   const fetchSources = async () => {
     try {
       const data = await sourcesAPI.listAll();
@@ -207,7 +218,12 @@ function Transaction() {
           </thead>
           <tbody>
             {visibleTransactions.map((t) => (
-              <tr key={t.transaction_id}>
+              <tr
+                key={t.transaction_id}
+                onClick={() => fetchTransactionItems(t.transaction_id)}
+                className="clickable-row"
+                style={{ cursor: "pointer", background: selectedTransactionInfo?.transaction_id === t.transaction_id ? "#eef" : "white" }}
+              >
                 <td>
                   <input
                     type="checkbox"
@@ -231,6 +247,35 @@ function Transaction() {
             ))}
           </tbody>
         </table>
+        {selectedTransactionInfo && (
+          <div className="transaction-details-box">
+            <h3>Transaction #{selectedTransactionInfo.transaction_id}</h3>
+            <p><b>Type:</b> {selectedTransactionInfo.type}</p>
+            <p><b>Date:</b> {selectedTransactionInfo.transaction_date?.split("T")[0]}</p>
+            <p><b>Total:</b> ${selectedTransactionInfo.total_amount}</p>
+
+            <h4>Items:</h4>
+
+            <table className="product-table">
+              <thead>
+                <tr>
+                  <th>Product</th>
+                  <th>Qty</th>
+                  <th>Price</th>
+                </tr>
+              </thead>
+              <tbody>
+                {selectedTransactionItems.map((item) => (
+                  <tr key={item.transaction_item_id}>
+                    <td>{item.product_name}</td>
+                    <td>{item.quantity}</td>
+                    <td>${item.price}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
     </section>
   );

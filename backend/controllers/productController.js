@@ -306,7 +306,7 @@ exports.sellProduct = async (c) => {
 
     // Insert transaction
     statements.push(
-      c.env.DB.prepare("INSERT INTO transactions (user_id, total_amount) VALUES (?, ?)").bind(userId, totalAmount)
+      c.env.DB.prepare("INSERT INTO transactions (user_id, total_amount, type) VALUES (?, ?, ?)").bind(userId, totalAmount, "sold")
     );
 
     // After inserting, get last row ID

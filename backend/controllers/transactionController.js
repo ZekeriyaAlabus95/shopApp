@@ -35,8 +35,7 @@ exports.getItems = async (c) => {
        WHERE ti.transaction_id = ? AND ti.user_id = ?`
     ).bind(txId, userId).all();
 
-    const rows = res.results || [];
-    return c.json({ items: rows });
+    return c.json({ items: res.results || [] });
   } catch (err) {
     console.error(err);
     return c.json({ error: 'Database error' }, 500);
