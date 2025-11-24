@@ -352,7 +352,7 @@ exports.sellProduct = async (c) => {
 
 exports.addOrIncrease = async (c) => {
   try {
-    const userId = c.req.header('X-User-ID');
+    const userId = c.req.header("X-User-ID");
     if (!userId) {
       return c.json({ error: "User ID required" }, 400);
     }
@@ -364,79 +364,94 @@ exports.addOrIncrease = async (c) => {
     const unitPrice = Number(price);
     const totalAmount = Number((qty * unitPrice).toFixed(2));
 
-    // Begin transaction
-    await c.env.DB.prepare("BEGIN").run();
+    let transactionId = null;
 
-    // Check if product exists
-    const existing = await c.env.DB.prepare(
-      "SELECT product_id, quantity FROM product WHERE barcode = ? AND user_id = ?"
-    )
-      .bind(barcode, userId)
-      .all();
+    // -----------------------------
+    // 🚀 Run everything atomically
+    // -----------------------------
+    await c.env.DB.transaction(async (txn) => {
+      // Check if product exists
+      const existing = await txn
+        .prepare(
+          "SELECT product_id, quantity FROM product WHERE barcode = ? AND user_id = ?"
+        )
+        .bind(barcode, userId)
+        .all();
 
-    const rows = existing.results || [];
-    let productId;
+      const rows = existing.results || [];
+      let productId;
 
-    if (rows.length > 0) {
-      // ---- Product exists → increase quantity ----
-      const newQty = Number(rows[0].quantity) + qty;
-      productId = rows[0].product_id;
+      if (rows.length > 0) {
+        // ---- Update existing product ----
+        const newQty = Number(rows[0].quantity) + qty;
+        productId = rows[0].product_id;
 
-      await c.env.DB.prepare(
-        "UPDATE product SET quantity = ?, price = ? WHERE product_id = ? AND user_id = ?"
-      )
-        .bind(newQty, unitPrice, productId, userId)
+        await txn
+          .prepare(
+            "UPDATE product SET quantity = ?, price = ? WHERE product_id = ? AND user_id = ?"
+          )
+          .bind(newQty, unitPrice, productId, userId)
+          .run();
+      } else {
+        // ---- Insert new product ----
+        await txn
+          .prepare(
+            `INSERT INTO product (barcode, price, date_accepted, product_name, quantity, source_id, category, user_id)
+             VALUES (?, ?, DATE('now'), ?, ?, ?, ?, ?)`
+          )
+          .bind(
+            barcode,
+            unitPrice,
+            product_name,
+            qty,
+            source_id,
+            category,
+            userId
+          )
+          .run();
+
+        const idRes = await txn
+          .prepare("SELECT last_insert_rowid() AS id")
+          .all();
+
+        productId = idRes.results?.[0]?.id;
+      }
+
+      // ---- Create buy transaction ----
+      await txn
+        .prepare(
+          `INSERT INTO transactions (user_id, source_id, total_amount, type)
+           VALUES (?, ?, ?, 'buy')`
+        )
+        .bind(userId, source_id, totalAmount)
         .run();
-    } else {
-      // ---- Insert new product ----
-      await c.env.DB.prepare(
-        `INSERT INTO product (barcode, price, date_accepted, product_name, quantity, source_id, category, user_id)
-         VALUES (?, ?, DATE('now'), ?, ?, ?, ?, ?)`
-      )
-        .bind(barcode, unitPrice, product_name, qty, source_id, category, userId)
+
+      const txRes = await txn
+        .prepare("SELECT last_insert_rowid() AS id")
+        .all();
+
+      transactionId = txRes.results?.[0]?.id;
+
+      // ---- Add transaction item ----
+      await txn
+        .prepare(
+          `INSERT INTO transaction_item (transaction_id, product_id, user_id, quantity, price)
+           VALUES (?, ?, ?, ?, ?)`
+        )
+        .bind(transactionId, productId, userId, qty, unitPrice)
         .run();
-
-      const idRes = await c.env.DB.prepare(
-        "SELECT last_insert_rowid() as id"
-      ).all();
-
-      productId = idRes.results?.[0]?.id;
-    }
-
-    // ---- Add buy transaction ----
-    await c.env.DB.prepare(
-      `INSERT INTO transactions (user_id, source_id, total_amount, type)
-       VALUES (?, ?, ?, 'buy')`
-    )
-      .bind(userId, source_id, totalAmount)
-      .run();
-
-    const txIdRes = await c.env.DB.prepare(
-      "SELECT last_insert_rowid() as id"
-    ).all();
-    const transactionId = txIdRes.results?.[0]?.id;
-
-    // ---- Add transaction item ----
-    await c.env.DB.prepare(
-      `INSERT INTO transaction_item (transaction_id, product_id, user_id, quantity, price)
-       VALUES (?, ?, ?, ?, ?)`
-    )
-      .bind(transactionId, productId, userId, qty, unitPrice)
-      .run();
-
-    await c.env.DB.prepare("COMMIT").run();
+    });
 
     return c.json({
-      message: rows.length > 0
-        ? `✅ Product exists. Quantity increased by ${quantity}.`
-        : "✅ Product added successfully.",
+      message:
+        transactionId !== null
+          ? "✅ Product added / updated and transaction recorded"
+          : "❌ Transaction error",
       transaction_id: transactionId,
       total_amount: totalAmount,
     });
-
   } catch (err) {
     console.error(err);
-    await c.env.DB.prepare("ROLLBACK").run();
     return c.json({ error: "❌ Database error" }, 500);
   }
 };
