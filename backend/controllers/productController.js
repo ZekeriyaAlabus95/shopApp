@@ -257,78 +257,85 @@ exports.sellProduct = async (c) => {
     }
 
     const { items } = await c.req.json();
-    // items = [{ product_id: number, quantity: number }]
-
     if (!Array.isArray(items) || items.length === 0) {
       return c.json({ error: "No products provided for selling" }, 400);
     }
 
-    try {
-      await c.env.DB.prepare("BEGIN").run();
+    let transactionId = null;
+    let totalAmount = 0;
 
-      // Validate stock and compute total with current snapshot prices
-      let totalAmount = 0;
+    await c.env.DB.transaction(async (txn) => {
+      let total = 0;
       const itemsWithPrice = [];
 
+      // Validate & calculate
       for (const item of items) {
-        const res1 = await c.env.DB.prepare(
-          "SELECT product_id, price, quantity FROM product WHERE product_id = ? AND user_id = ?"
-        ).bind(item.product_id, userId).all();
-        const rows = res1.results || [];
+        const res = await txn
+          .prepare(
+            "SELECT product_id, price, quantity FROM product WHERE product_id = ? AND user_id = ?"
+          )
+          .bind(item.product_id, userId)
+          .all();
 
-        if (!rows || rows.length === 0) {
+        if (!res.results.length) {
           throw new Error(`Product ID ${item.product_id} not found`);
         }
 
-        const product = rows[0];
-        const currentQty = Number(product.quantity);
-        const price = Number(product.price);
-        const qty = Number(item.quantity);
-
-        if (!Number.isFinite(qty) || qty <= 0) {
-          throw new Error(`Invalid quantity for product ID ${item.product_id}`);
-        }
-        if (currentQty < qty) {
+        const p = res.results[0];
+        if (p.quantity < item.quantity) {
           throw new Error(
-            `Not enough quantity for product ID ${item.product_id}. Available: ${currentQty}`
+            `Not enough quantity for product ID ${item.product_id}. Available: ${p.quantity}`
           );
         }
 
-        totalAmount += price * qty;
-        itemsWithPrice.push({ product_id: item.product_id, quantity: qty, price });
+        total += p.price * item.quantity;
+        itemsWithPrice.push({
+          product_id: p.product_id,
+          qty: item.quantity,
+          price: p.price,
+        });
       }
+
+      totalAmount = Number(total.toFixed(2));
 
       // Insert transaction
-      await c.env.DB.prepare(
-        "INSERT INTO transactions (user_id, total_amount) VALUES (?, ?)"
-      ).bind(userId, Number(totalAmount.toFixed(2))).run();
-      // Get last inserted id in SQLite
-      const txIdRes = await c.env.DB.prepare("SELECT last_insert_rowid() as id").all();
-      const transactionId = txIdRes.results && txIdRes.results[0] && txIdRes.results[0].id;
+      await txn
+        .prepare("INSERT INTO transactions (user_id, total_amount) VALUES (?, ?)")
+        .bind(userId, totalAmount)
+        .run();
 
-      // Insert items and decrement stock
+      const idRes = await txn.prepare("SELECT last_insert_rowid() AS id").all();
+      transactionId = idRes.results[0].id;
+
+      // Insert items & update stock
       for (const it of itemsWithPrice) {
-        await c.env.DB.prepare(
-          "INSERT INTO transaction_item (transaction_id, product_id, user_id, quantity, price) VALUES (?, ?, ?, ?, ?)"
-        ).bind(transactionId, it.product_id, userId, it.quantity, Number(it.price.toFixed(2))).run();
+        await txn
+          .prepare(
+            "INSERT INTO transaction_item (transaction_id, product_id, user_id, quantity, price) VALUES (?, ?, ?, ?, ?)"
+          )
+          .bind(transactionId, it.product_id, userId, it.qty, it.price)
+          .run();
 
-        await c.env.DB.prepare(
-          "UPDATE product SET quantity = quantity - ? WHERE product_id = ? AND user_id = ?"
-        ).bind(it.quantity, it.product_id, userId).run();
+        await txn
+          .prepare(
+            "UPDATE product SET quantity = quantity - ? WHERE product_id = ? AND user_id = ?"
+          )
+          .bind(it.qty, it.product_id, userId)
+          .run();
       }
+    });
 
-      await c.env.DB.prepare("COMMIT").run();
-      return c.json({ message: "✅ Sale recorded", transaction_id: transactionId, total_amount: Number(totalAmount.toFixed(2)) });
-    } catch (err) {
-      await c.env.DB.prepare("ROLLBACK").run();
-      console.error(err);
-      return c.json({ error: err.message }, 400);
-    }
+    return c.json({
+      message: "✅ Sale recorded",
+      transaction_id: transactionId,
+      total_amount: totalAmount,
+    });
   } catch (err) {
     console.error(err);
-    return c.json({ error: "❌ Database error" }, 500);
+    return c.json({ error: err.message || "Database error" }, 500);
   }
 };
+
 
 exports.addOrIncrease = async (c) => {
   try {
