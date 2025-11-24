@@ -251,7 +251,7 @@ exports.findByBarcode = async (c) => {
 // POST /sell - sell products and record transaction
 exports.sellProduct = async (c) => {
   try {
-    const userId = c.req.header('X-User-ID');
+    const userId = c.req.header("X-User-ID");
     if (!userId) {
       return c.json({ error: "User ID required" }, 400);
     }
@@ -261,75 +261,88 @@ exports.sellProduct = async (c) => {
       return c.json({ error: "No products provided for selling" }, 400);
     }
 
-    let transactionId = null;
-    let totalAmount = 0;
+    // 1) الحصول على بيانات المنتجات قبل البيع
+    const productIds = items.map(i => i.product_id);
+    const placeholders = productIds.map(() => "?").join(",");
 
-    await c.env.DB.transaction(async (txn) => {
-      let total = 0;
-      const itemsWithPrice = [];
+    const existing = await c.env.DB
+      .prepare(`SELECT product_id, price, quantity FROM product WHERE product_id IN (${placeholders}) AND user_id = ?`)
+      .bind(...productIds, userId)
+      .all();
 
-      // Validate & calculate
-      for (const item of items) {
-        const res = await txn
-          .prepare(
-            "SELECT product_id, price, quantity FROM product WHERE product_id = ? AND user_id = ?"
-          )
-          .bind(item.product_id, userId)
-          .all();
+    const rows = existing.results || [];
+    if (rows.length !== items.length) {
+      return c.json({ error: "Some products not found" }, 400);
+    }
 
-        if (!res.results.length) {
-          throw new Error(`Product ID ${item.product_id} not found`);
-        }
+    // 2) التحقق من الكميات وحساب المجموع
+    let total = 0;
+    const updates = [];
+    const soldItems = [];
 
-        const p = res.results[0];
-        if (p.quantity < item.quantity) {
-          throw new Error(
-            `Not enough quantity for product ID ${item.product_id}. Available: ${p.quantity}`
-          );
-        }
+    for (const item of items) {
+      const p = rows.find(r => r.product_id === item.product_id);
+      if (!p) return c.json({ error: `Product ${item.product_id} not found` }, 400);
 
-        total += p.price * item.quantity;
-        itemsWithPrice.push({
-          product_id: p.product_id,
-          qty: item.quantity,
-          price: p.price,
-        });
+      if (p.quantity < item.quantity) {
+        return c.json({
+          error: `Not enough quantity for product ${item.product_id}. Available: ${p.quantity}`
+        }, 400);
       }
 
-      totalAmount = Number(total.toFixed(2));
+      total += p.price * item.quantity;
 
-      // Insert transaction
-      await txn
-        .prepare("INSERT INTO transactions (user_id, total_amount) VALUES (?, ?)")
-        .bind(userId, totalAmount)
-        .run();
+      updates.push({
+        product_id: p.product_id,
+        reduce: item.quantity,
+        price: p.price
+      });
+    }
 
-      const idRes = await txn.prepare("SELECT last_insert_rowid() AS id").all();
-      transactionId = idRes.results[0].id;
+    const totalAmount = Number(total.toFixed(2));
 
-      // Insert items & update stock
-      for (const it of itemsWithPrice) {
-        await txn
-          .prepare(
-            "INSERT INTO transaction_item (transaction_id, product_id, user_id, quantity, price) VALUES (?, ?, ?, ?, ?)"
-          )
-          .bind(transactionId, it.product_id, userId, it.qty, it.price)
-          .run();
+    // 3) تنفيذ العمليات دفعة واحدة batch()
+    const statements = [];
 
-        await txn
-          .prepare(
-            "UPDATE product SET quantity = quantity - ? WHERE product_id = ? AND user_id = ?"
-          )
-          .bind(it.qty, it.product_id, userId)
-          .run();
-      }
-    });
+    // Insert transaction
+    statements.push(
+      c.env.DB.prepare("INSERT INTO transactions (user_id, total_amount) VALUES (?, ?)").bind(userId, totalAmount)
+    );
+
+    // After inserting, get last row ID
+    statements.push(
+      c.env.DB.prepare("SELECT last_insert_rowid() as id")
+    );
+
+    const batchResult = await c.env.DB.batch(statements);
+
+    const transactionId = batchResult[1].results[0].id;
+
+    // 4) إدخال العناصر وتحديث الكميات
+    const itemStatements = [];
+
+    for (const u of updates) {
+      itemStatements.push(
+        c.env.DB.prepare(
+          "INSERT INTO transaction_item (transaction_id, product_id, user_id, quantity, price) VALUES (?, ?, ?, ?, ?)"
+        ).bind(transactionId, u.product_id, userId, u.reduce, u.price)
+      );
+
+      itemStatements.push(
+        c.env.DB.prepare(
+          "UPDATE product SET quantity = quantity - ? WHERE product_id = ? AND user_id = ?"
+        ).bind(u.reduce, u.product_id, userId)
+      );
+    }
+
+    await c.env.DB.batch(itemStatements);
 
     return c.json({
-      message: "✅ Sale recorded",
+      message: "✅ Sale recorded successfully",
       transaction_id: transactionId,
-      total_amount: totalAmount,
+      total_amount: totalAmount
     });
+
   } catch (err) {
     console.error(err);
     return c.json({ error: err.message || "Database error" }, 500);
